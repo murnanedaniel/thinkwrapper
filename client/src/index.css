@@ -1,0 +1,86 @@
+:root {
+  --primary-color: #3498db;
+  --secondary-color: #2ecc71;
+  --dark-color: #2c3e50;
+  --light-color: #ecf0f1;
+  --danger-color: #e74c3c;
+  --box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
+  --font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-family);
+  line-height: 1.6;
+  color: var(--dark-color);
+  background-color: var(--light-color);
+}
+
+a {
+  text-decoration: none;
+  color: var(--primary-color);
+}
+
+ul {
+  list-style: none;
+}
+
+.btn {
+  display: inline-block;
+  padding: 0.8rem 1.5rem;
+  margin: 0.5rem;
+  border-radius: 4px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.btn-primary {
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+}
+
+.btn-primary:hover {
+  background-color: #2980b9;
+}
+
+.btn-outline {
+  background-color: transparent;
+  border: 1px solid var(--primary-color);
+  color: var(--primary-color);
+}
+
+.btn-outline:hover {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 2rem;
+}
+
+.app-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+main {
+  flex: 1;
+}
+
+footer {
+  text-align: center;
+  padding: 1rem;
+  background-color: var(--dark-color);
+  color: white;
+} 
