@@ -1,9 +1,22 @@
 import { Link } from 'react-router-dom'
+import { useAuth0 } from '@auth0/auth0-react'
+import Auth0LoginButton from './Auth0LoginButton'
+import Auth0LogoutButton from './Auth0LogoutButton'
 
-function Header({ isLoggedIn, setIsLoggedIn }) {
-  const handleLogout = () => {
-    // In a real app, we would call an API endpoint to logout
-    setIsLoggedIn(false)
+function Header() {
+  const { isAuthenticated, user, isLoading } = useAuth0();
+
+  if (isLoading) {
+    return (
+      <header className="border-b border-gray-100 py-4">
+        <div className="container mx-auto px-4 md:px-8 flex justify-between items-center">
+          <Link to="/" className="text-xl font-normal text-gray-900">
+            ThinkWrapper
+          </Link>
+          <div>Loading...</div>
+        </div>
+      </header>
+    );
   }
 
   return (
@@ -14,7 +27,7 @@ function Header({ isLoggedIn, setIsLoggedIn }) {
         </Link>
         <nav>
           <ul className="flex space-x-8 items-center">
-            {isLoggedIn ? (
+            {isAuthenticated ? (
               <>
                 <li>
                   <Link 
@@ -33,31 +46,18 @@ function Header({ isLoggedIn, setIsLoggedIn }) {
                   </Link>
                 </li>
                 <li>
-                  <button 
-                    onClick={handleLogout} 
-                    className="text-gray-700 hover:text-gray-900"
-                  >
-                    Logout
-                  </button>
+                  <span className="text-gray-700 mr-2">
+                    {user?.name || user?.email}
+                  </span>
+                </li>
+                <li>
+                  <Auth0LogoutButton />
                 </li>
               </>
             ) : (
               <>
                 <li>
-                  <Link 
-                    to="/login"
-                    className="text-gray-700 hover:text-gray-900"
-                  >
-                    Login
-                  </Link>
-                </li>
-                <li>
-                  <Link 
-                    to="/signup" 
-                    className="text-gray-700 hover:text-gray-900"
-                  >
-                    Sign Up
-                  </Link>
+                  <Auth0LoginButton />
                 </li>
               </>
             )}

@@ -1,60 +1,69 @@
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, request, jsonify, current_app, redirect, url_for, session
 from flask_login import login_user, logout_user, login_required, current_user
 from .models import db, User
 from .services import verify_paddle_webhook # Import the verification function
+from .auth0_config import AUTH0_DOMAIN, AUTH0_CLIENT_ID, AUTH0_CLIENT_SECRET, AUTH0_CALLBACK_URL
+from authlib.integrations.flask_client import OAuth
+import json
+from urllib.parse import urlencode
 
 bp = Blueprint('auth', __name__)
 
-@bp.route('/register', methods=['POST'])
-def register():
-    data = request.json
-    email = data.get('email')
-    password = data.get('password')
+# Set up OAuth for Auth0
+oauth = OAuth()
+auth0 = oauth.register(
+    'auth0',
+    client_id=AUTH0_CLIENT_ID,
+    client_secret=AUTH0_CLIENT_SECRET,
+    api_base_url=f'https://{AUTH0_DOMAIN}',
+    access_token_url=f'https://{AUTH0_DOMAIN}/oauth/token',
+    authorize_url=f'https://{AUTH0_DOMAIN}/authorize',
+    client_kwargs={
+        'scope': 'openid profile email',
+    },
+)
 
-    if not email or not password:
-        return jsonify({'error': 'Email and password are required'}), 400
+# Initialize OAuth with the app in __init__.py
+def init_auth0(app):
+    oauth.init_app(app)
 
-    if User.query.filter_by(email=email).first():
-        return jsonify({'error': 'Email address already registered'}), 409 # Conflict
-
-    new_user = User(email=email)
-    new_user.set_password(password)
-    db.session.add(new_user)
-    db.session.commit()
-
-    login_user(new_user) # Log in the user after registration
-    return jsonify({
-        'status': 'success',
-        'message': 'User registered and logged in successfully.',
-        'user': {'id': new_user.id, 'email': new_user.email}
-    }), 201
-
-@bp.route('/login', methods=['POST'])
+@bp.route('/login')
 def login():
-    data = request.json
-    email = data.get('email')
-    password = data.get('password')
+    """Redirect to Auth0 login page"""
+    return auth0.authorize_redirect(redirect_uri=AUTH0_CALLBACK_URL)
 
-    if not email or not password:
-        return jsonify({'error': 'Email and password are required'}), 400
-
-    user = User.query.filter_by(email=email).first()
-
-    if user is None or not user.check_password(password):
-        return jsonify({'error': 'Invalid email or password'}), 401
-
+@bp.route('/callback')
+def callback():
+    """Handle the Auth0 callback - get and store tokens, log user in"""
+    token = auth0.authorize_access_token()
+    resp = auth0.get('userinfo')
+    userinfo = resp.json()
+    
+    # Store Auth0 user info in session
+    session['jwt_payload'] = userinfo
+    
+    # Find or create user
+    user = User.get_or_create_from_auth0(userinfo)
+    
+    # Log user in with Flask-Login
     login_user(user)
-    return jsonify({
-        'status': 'success',
-        'message': 'Logged in successfully.',
-        'user': {'id': user.id, 'email': user.email}
-    })
+    
+    # Redirect to dashboard upon successful login
+    return redirect('/dashboard')
 
-@bp.route('/logout', methods=['POST'])
-@login_required # Ensure user is logged in to log out
+@bp.route('/logout')
+@login_required
 def logout():
+    """Log out the user from both the app and Auth0"""
+    # Clear Flask session
+    session.clear()
+    
+    # Log out of Flask-Login
     logout_user()
-    return jsonify({'status': 'success', 'message': 'Logged out successfully.'})
+    
+    # Redirect to Auth0 logout endpoint
+    params = {'returnTo': url_for('routes.index', _external=True), 'client_id': AUTH0_CLIENT_ID}
+    return redirect(f'https://{AUTH0_DOMAIN}/v2/logout?{urlencode(params)}')
 
 @bp.route('/status')
 @login_required

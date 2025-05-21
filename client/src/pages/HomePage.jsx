@@ -1,6 +1,10 @@
 import { Link } from 'react-router-dom'
+import { useAuth0 } from '@auth0/auth0-react'
+import Auth0LoginButton from '../components/Auth0LoginButton'
 
 function HomePage() {
+  const { isAuthenticated, isLoading } = useAuth0();
+  
   return (
     <div className="bg-white">
       {/* Main content - extremely minimal, centered */}
@@ -22,19 +26,31 @@ function HomePage() {
                 placeholder="Enter your newsletter topic..." 
                 className="w-full px-4 py-3 outline-none text-gray-800"
               />
-              <Link to="/create" className="px-6 py-3 border-l border-gray-300 text-gray-700 hover:text-gray-900">
-                Create
-              </Link>
+              {isAuthenticated ? (
+                <Link to="/create" className="px-6 py-3 border-l border-gray-300 text-gray-700 hover:text-gray-900">
+                  Create
+                </Link>
+              ) : (
+                <span className="px-6 py-3 border-l border-gray-300 text-gray-400 cursor-not-allowed">
+                  Create
+                </span>
+              )}
             </div>
           </div>
 
           <div className="flex flex-col sm:flex-row justify-center space-y-3 sm:space-y-0 sm:space-x-6">
-            <Link 
-              to="/create" 
-              className="px-5 py-2 border border-gray-300 rounded text-gray-800 hover:border-gray-400"
-            >
-              Create Your First Newsletter
-            </Link>
+            {isLoading ? (
+              <div className="px-5 py-2">Loading...</div>
+            ) : isAuthenticated ? (
+              <Link 
+                to="/create" 
+                className="px-5 py-2 border border-gray-300 rounded text-gray-800 hover:border-gray-400"
+              >
+                Create Your First Newsletter
+              </Link>
+            ) : (
+              <Auth0LoginButton />
+            )}
             <a 
               href="#how-it-works" 
               className="px-5 py-2 text-gray-600 hover:text-gray-800"
@@ -110,12 +126,16 @@ function HomePage() {
               Email delivery
             </li>
           </ul>
-          <Link 
-            to="/create" 
-            className="inline-block px-6 py-2 border border-gray-300 rounded text-gray-800 hover:border-gray-400"
-          >
-            Get Started
-          </Link>
+          {isAuthenticated ? (
+            <Link 
+              to="/create" 
+              className="inline-block px-6 py-2 border border-gray-300 rounded text-gray-800 hover:border-gray-400"
+            >
+              Get Started
+            </Link>
+          ) : (
+            <Auth0LoginButton />
+          )}
         </div>
       </section>
     </div>

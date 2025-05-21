@@ -82,6 +82,9 @@ def create_app(test_config=None):
     from . import auth as auth_bp # Assuming auth.py will exist
     app.register_blueprint(auth_bp.bp, url_prefix='/auth')
     
+    # Initialize Auth0
+    auth_bp.init_auth0(app)
+    
     # A simple route to check if the app is running
     @app.route('/health')
     def health():
@@ -95,4 +98,7 @@ def create_app(test_config=None):
 # heroku config:set OPENAI_API_KEY=...
 # heroku config:set SENDGRID_API_KEY=...
 # heroku config:set PADDLE_WEBHOOK_SECRET=...
+# heroku config:set AUTH0_DOMAIN='dev-26w2jl00f1tc85cq.us.auth0.com'
+# heroku config:set AUTH0_CLIENT_ID='Wo2xo4VE3fHctnAzRm1U6WIzXtNkgyUY'
+# heroku config:set AUTH0_CLIENT_SECRET='YCbb7vmHqR7a_1Af-SbJ3A06EvIcGtuSpIOH1oiAcPPRf3fs058HGurr1U6bQano'
 # --- 
