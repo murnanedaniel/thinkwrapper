@@ -4,7 +4,7 @@
   "description": "AI Newsletter Generator",
   "scripts": {
     "start": "echo 'Application is running'",
-    "heroku-postbuild": "cd client && npm ci && npm run build && cp -r dist ../app/static",
+    "heroku-postbuild": "cd client && npm ci && npm run build",
     "build": "cd client && npm run build"
   },
   "engines": {
