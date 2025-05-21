@@ -5,6 +5,7 @@ from flask_login import LoginManager # Import LoginManager
 # from flask_cors import CORS  # Uncomment if you need CORS
 # from flask_limiter import Limiter  # Uncomment if you want rate limiting
 # from flask_limiter.util import get_remote_address
+from sqlalchemy import inspect
 
 def create_app(test_config=None):
     """Create and configure the Flask application."""
@@ -67,7 +68,11 @@ def create_app(test_config=None):
     # Create database tables if they don't exist (for development/testing)
     # For production, migrations (e.g. Flask-Migrate) are recommended.
     with app.app_context():
-        db.create_all()
+        # Check if tables already exist before trying to create them
+        inspector = inspect(db.engine)
+        existing_tables = inspector.get_table_names()
+        if not existing_tables:
+            db.create_all()
     
     # Register routes
     from . import routes
