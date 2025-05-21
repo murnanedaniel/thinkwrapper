@@ -13,9 +13,14 @@ def create_app(test_config=None):
     # Load configuration
     if test_config is None:
         # Load the instance config when not testing
+        # Fix for Heroku PostgreSQL: replace 'postgres:' with 'postgresql:'
+        database_url = os.environ.get('DATABASE_URL', 'sqlite:///:memory:')
+        if database_url.startswith('postgres:'):
+            database_url = database_url.replace('postgres:', 'postgresql:', 1)
+            
         app.config.from_mapping(
             SECRET_KEY=os.environ.get('SECRET_KEY', 'dev_secret_key'), # Needed for sessions
-            SQLALCHEMY_DATABASE_URI=os.environ.get('DATABASE_URL', 'sqlite:///:memory:'),
+            SQLALCHEMY_DATABASE_URI=database_url,
             SQLALCHEMY_TRACK_MODIFICATIONS=False
         )
     else:
