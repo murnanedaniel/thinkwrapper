@@ -1,4 +1,10 @@
+import os
 from flask import Flask
+from .models import db, User # Import User for Flask-Login
+from flask_login import LoginManager # Import LoginManager
+# from flask_cors import CORS  # Uncomment if you need CORS
+# from flask_limiter import Limiter  # Uncomment if you want rate limiting
+# from flask_limiter.util import get_remote_address
 
 def create_app(test_config=None):
     """Create and configure the Flask application."""
@@ -7,18 +13,76 @@ def create_app(test_config=None):
     # Load configuration
     if test_config is None:
         # Load the instance config when not testing
-        app.config.from_pyfile('config.py', silent=True)
+        app.config.from_mapping(
+            SECRET_KEY=os.environ.get('SECRET_KEY', 'dev_secret_key'), # Needed for sessions
+            SQLALCHEMY_DATABASE_URI=os.environ.get('DATABASE_URL', 'sqlite:///:memory:'),
+            SQLALCHEMY_TRACK_MODIFICATIONS=False
+        )
     else:
         # Load the test config if passed in
         app.config.from_mapping(test_config)
+        # Ensure a default database URI for tests if not provided
+        app.config.setdefault('SQLALCHEMY_DATABASE_URI', 'sqlite:///:memory:')
+        app.config.setdefault('SQLALCHEMY_TRACK_MODIFICATIONS', False)
+        app.config.setdefault('SECRET_KEY', 'test_secret_key') # Ensure test key for tests
+
+    # --- Production Security Settings ---
+    if not app.debug and not app.testing:
+        app.config.update(
+            SESSION_COOKIE_SECURE=True,
+            SESSION_COOKIE_HTTPONLY=True,
+            SESSION_COOKIE_SAMESITE='Lax',
+            REMEMBER_COOKIE_SECURE=True,
+            REMEMBER_COOKIE_HTTPONLY=True,
+            REMEMBER_COOKIE_SAMESITE='Lax',
+        )
+        # Ensure Flask knows it's behind a proxy (Heroku)
+        from werkzeug.middleware.proxy_fix import ProxyFix
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+        # Uncomment and configure if you need CORS (e.g. frontend on different domain)
+        # from flask_cors import CORS
+        # CORS(app, supports_credentials=True, origins=['https://yourfrontend.com'])
+        # Uncomment and configure if you want rate limiting
+        # limiter = Limiter(app, key_func=get_remote_address, default_limits=["200 per day", "50 per hour"])
+
+    # Initialize extensions
+    db.init_app(app)
+
+    # Initialize Flask-Login
+    login_manager = LoginManager()
+    login_manager.init_app(app)
+    login_manager.login_view = 'auth.login'  # Redirect unauthenticated users to login
+    # login_manager.login_message_category = "info" # Optional: for flashing messages
+
+    @login_manager.user_loader
+    def load_user(user_id):
+        # Use db.session.get for SQLAlchemy 2.0 compatibility
+        return db.session.get(User, int(user_id))
+
+    # Create database tables if they don't exist (for development/testing)
+    # For production, migrations (e.g. Flask-Migrate) are recommended.
+    with app.app_context():
+        db.create_all()
     
     # Register routes
     from . import routes
     app.register_blueprint(routes.bp)
     
+    # Import and register auth blueprint
+    from . import auth as auth_bp # Assuming auth.py will exist
+    app.register_blueprint(auth_bp.bp, url_prefix='/auth')
+    
     # A simple route to check if the app is running
     @app.route('/health')
     def health():
         return {'status': 'ok'}
-        
-    return app 
+    
+    return app
+
+# ---
+# IMPORTANT: In production, set SECRET_KEY and all other secrets using Heroku config vars, e.g.:
+# heroku config:set SECRET_KEY='your-very-strong-secret'
+# heroku config:set OPENAI_API_KEY=...
+# heroku config:set SENDGRID_API_KEY=...
+# heroku config:set PADDLE_WEBHOOK_SECRET=...
+# --- 

@@ -31,7 +31,7 @@ An AI-powered newsletter generation service that allows users to create and sche
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/thinkwrapper.git
+   git clone https://github.com/murnanedaniel/thinkwrapper.git
    cd thinkwrapper
    ```
 

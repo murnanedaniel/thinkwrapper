@@ -1,43 +1,57 @@
-from datetime import datetime
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
+from datetime import datetime, timezone
+from flask_sqlalchemy import SQLAlchemy
+from werkzeug.security import generate_password_hash, check_password_hash # Import hashing functions
+from flask_login import UserMixin # Import UserMixin
 
-Base = declarative_base()
+db = SQLAlchemy()
 
-class User(Base):
+class User(UserMixin, db.Model):
     __tablename__ = 'users'
     
-    id = Column(Integer, primary_key=True)
-    email = Column(String(254), unique=True, nullable=False)
-    subscription_id = Column(String(128), nullable=True)  # Paddle subscription ID
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(254), unique=True, nullable=False, index=True)
+    password_hash = db.Column(db.String(256), nullable=True) # Made nullable for now if users can exist before setting a password (e.g. via Paddle first)
+    subscription_id = db.Column(db.String(128), nullable=True, index=True)  # Paddle subscription ID
+    is_active = db.Column(db.Boolean, default=True) # General active status
+    # paddle_customer_id = db.Column(db.String(128), nullable=True, index=True) # Consider adding later
+    # subscription_status = db.Column(db.String(50), nullable=True) # e.g., active, past_due, canceled
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     
-    newsletters = relationship("Newsletter", back_populates="user")
+    newsletters = db.relationship("Newsletter", back_populates="user")
 
-class Newsletter(Base):
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        if not self.password_hash:
+            return False
+        return check_password_hash(self.password_hash, password)
+
+    def __repr__(self):
+        return f'<User {self.email}>'
+
+class Newsletter(db.Model):
     __tablename__ = 'newsletters'
     
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-    name = Column(String(100), nullable=False)
-    topic = Column(String(100), nullable=False)
-    schedule = Column(String(50), nullable=True)  # cron expression
-    last_sent_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    name = db.Column(db.String(100), nullable=False)
+    topic = db.Column(db.String(100), nullable=False)
+    schedule = db.Column(db.String(50), nullable=True)  # cron expression
+    last_sent_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     
-    user = relationship("User", back_populates="newsletters")
-    issues = relationship("Issue", back_populates="newsletter")
+    user = db.relationship("User", back_populates="newsletters")
+    issues = db.relationship("Issue", back_populates="newsletter")
 
-class Issue(Base):
+class Issue(db.Model):
     __tablename__ = 'issues'
     
-    id = Column(Integer, primary_key=True)
-    newsletter_id = Column(Integer, ForeignKey('newsletters.id'), nullable=False)
-    subject = Column(String(200), nullable=False)
-    content = Column(Text, nullable=False)
-    sent_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    id = db.Column(db.Integer, primary_key=True)
+    newsletter_id = db.Column(db.Integer, db.ForeignKey('newsletters.id'), nullable=False)
+    subject = db.Column(db.String(200), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    sent_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     
-    newsletter = relationship("Newsletter", back_populates="issues") 
+    newsletter = db.relationship("Newsletter", back_populates="issues") 

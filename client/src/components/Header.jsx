@@ -7,23 +7,36 @@ function Header({ isLoggedIn, setIsLoggedIn }) {
   }
 
   return (
-    <header className="header">
-      <div className="container header-container">
-        <Link to="/" className="logo">
+    <header className="border-b border-gray-100 py-4">
+      <div className="container mx-auto px-4 md:px-8 flex justify-between items-center">
+        <Link to="/" className="text-xl font-normal text-gray-900">
           ThinkWrapper
         </Link>
         <nav>
-          <ul>
+          <ul className="flex space-x-8 items-center">
             {isLoggedIn ? (
               <>
                 <li>
-                  <Link to="/dashboard">Dashboard</Link>
+                  <Link 
+                    to="/dashboard" 
+                    className="text-gray-700 hover:text-gray-900"
+                  >
+                    Dashboard
+                  </Link>
                 </li>
                 <li>
-                  <Link to="/create">Create New</Link>
+                  <Link 
+                    to="/create"
+                    className="text-gray-700 hover:text-gray-900"
+                  >
+                    Create New
+                  </Link>
                 </li>
                 <li>
-                  <button onClick={handleLogout} className="btn-link">
+                  <button 
+                    onClick={handleLogout} 
+                    className="text-gray-700 hover:text-gray-900"
+                  >
                     Logout
                   </button>
                 </li>
@@ -31,10 +44,18 @@ function Header({ isLoggedIn, setIsLoggedIn }) {
             ) : (
               <>
                 <li>
-                  <Link to="/login">Login</Link>
+                  <Link 
+                    to="/login"
+                    className="text-gray-700 hover:text-gray-900"
+                  >
+                    Login
+                  </Link>
                 </li>
                 <li>
-                  <Link to="/signup" className="btn btn-primary">
+                  <Link 
+                    to="/signup" 
+                    className="text-gray-700 hover:text-gray-900"
+                  >
                     Sign Up
                   </Link>
                 </li>
