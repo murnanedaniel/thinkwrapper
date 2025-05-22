@@ -1,10 +1,10 @@
 import { Link } from 'react-router-dom'
-import { useAuth0 } from '@auth0/auth0-react'
-import Auth0LoginButton from './Auth0LoginButton'
-import Auth0LogoutButton from './Auth0LogoutButton'
+import { useAuth } from './AuthContext'
+import LoginButton from './Auth0LoginButton'
+import LogoutButton from './Auth0LogoutButton'
 
 function Header() {
-  const { isAuthenticated, user, isLoading } = useAuth0();
+  const { isAuthenticated, user, isLoading } = useAuth();
 
   if (isLoading) {
     return (
@@ -47,17 +47,17 @@ function Header() {
                 </li>
                 <li>
                   <span className="text-gray-700 mr-2">
-                    {user?.name || user?.email}
+                    {user?.email}
                   </span>
                 </li>
                 <li>
-                  <Auth0LogoutButton />
+                  <LogoutButton />
                 </li>
               </>
             ) : (
               <>
                 <li>
-                  <Auth0LoginButton />
+                  <LoginButton />
                 </li>
               </>
             )}

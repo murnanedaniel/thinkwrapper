@@ -1,9 +1,9 @@
 import { Link } from 'react-router-dom'
-import { useAuth0 } from '@auth0/auth0-react'
-import Auth0LoginButton from '../components/Auth0LoginButton'
+import { useAuth } from '../components/AuthContext'
+import LoginButton from '../components/Auth0LoginButton'
 
 function HomePage() {
-  const { isAuthenticated, isLoading } = useAuth0();
+  const { isAuthenticated, isLoading } = useAuth();
   
   return (
     <div className="bg-white">
@@ -49,7 +49,7 @@ function HomePage() {
                 Create Your First Newsletter
               </Link>
             ) : (
-              <Auth0LoginButton />
+              <LoginButton />
             )}
             <a 
               href="#how-it-works" 
@@ -134,7 +134,7 @@ function HomePage() {
               Get Started
             </Link>
           ) : (
-            <Auth0LoginButton />
+            <LoginButton />
           )}
         </div>
       </section>

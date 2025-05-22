@@ -1,6 +1,6 @@
 import React from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
-import { useAuth0 } from '@auth0/auth0-react'
+import { AuthProvider, useAuth } from './components/AuthContext'
 import HomePage from './pages/HomePage'
 import Dashboard from './pages/Dashboard'
 import CreateNewsletter from './pages/CreateNewsletter'
@@ -8,7 +8,7 @@ import Header from './components/Header'
 
 // Protected route component
 const ProtectedRoute = ({ children }) => {
-  const { isAuthenticated, isLoading } = useAuth0();
+  const { isAuthenticated, isLoading } = useAuth();
   
   if (isLoading) {
     return <div className="text-center py-10">Loading...</div>;
@@ -21,8 +21,8 @@ const ProtectedRoute = ({ children }) => {
   return children;
 };
 
-function App() {
-  const { isLoading } = useAuth0();
+function AppContent() {
+  const { isLoading } = useAuth();
 
   if (isLoading) {
     return <div className="text-center py-10">Loading...</div>;
@@ -60,6 +60,14 @@ function App() {
       </footer>
     </div>
   )
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
+  );
 }
 
 export default App 
