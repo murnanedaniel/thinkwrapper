@@ -31,6 +31,17 @@ def init_auth0(app):
 @bp.route('/login')
 def login():
     """Redirect to Auth0 login page"""
+    # Multiple logging methods to ensure we see this
+    print(">>> LOGIN ROUTE HIT <<<")
+    current_app.logger.error(">>> LOGIN ROUTE HIT <<<")
+    
+    # Write to a simple file as a backup
+    try:
+        with open('/tmp/login_log.txt', 'a') as f:
+            f.write(f"Login hit at {datetime.now()}\n")
+    except:
+        pass
+    
     # Ensure session persists for Auth0 state parameter
     session.permanent = True
     
@@ -119,6 +130,17 @@ def session_test():
         'test_counter': session['test_counter'],
         'session_keys': list(session.keys()),
         'permanent': session.permanent
+    })
+
+@bp.route('/debug-cookies')
+def debug_cookies():
+    """Debug route to see all cookies and headers"""
+    return jsonify({
+        'cookies': dict(request.cookies),
+        'headers': dict(request.headers),
+        'session': dict(session),
+        'url': request.url,
+        'method': request.method
     })
 
 @bp.route('/paddle/webhook', methods=['POST'])
