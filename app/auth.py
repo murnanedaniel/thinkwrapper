@@ -22,6 +22,8 @@ auth0 = oauth.register(
     client_kwargs={
         'scope': 'openid profile email',
     },
+    # Manually specify JWKS URI to fix the discovery issue
+    jwks_uri=f'https://{AUTH0_DOMAIN}/.well-known/jwks.json',
 )
 
 # Initialize OAuth with the app in __init__.py
