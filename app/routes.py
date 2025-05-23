@@ -101,10 +101,15 @@ def get_newsletters_route():
         })
     return jsonify(output), 200
 
-# Catch-all to support client-side routing
+# Catch-all to support client-side routing (but exclude auth routes)
 @bp.route('/<path:path>')
 def catch_all(path):
     """Serve static files or return index.html for client-side routing."""
+    # Don't catch auth routes - let them go to the auth blueprint
+    if path.startswith('auth/'):
+        from flask import abort
+        abort(404)  # This will let other blueprints handle it
+    
     try:
         return send_from_directory(current_app.static_folder, path)
     except:
