@@ -17,8 +17,9 @@ export const AuthProvider = ({ children }) => {
           credentials: 'include' // Important for cookies
         });
         
-        if (response.ok) {
-          const data = await response.json();
+        const data = await response.json();
+        
+        if (response.ok && data.authenticated) {
           setIsAuthenticated(true);
           setUser(data.user);
         } else {

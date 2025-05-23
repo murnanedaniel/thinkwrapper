@@ -109,13 +109,22 @@ def logout():
     return redirect(f'https://{AUTH0_DOMAIN}/v2/logout?{urlencode(params)}')
 
 @bp.route('/status')
-@login_required
 def status():
     """Returns the current user's status."""
-    return jsonify({
-        'status': 'success',
-        'user': {'id': current_user.id, 'email': current_user.email}
-    })
+    # Instead of @login_required decorator, manually check if user is authenticated
+    if current_user.is_authenticated:
+        return jsonify({
+            'status': 'success',
+            'authenticated': True,
+            'user': {'id': current_user.id, 'email': current_user.email}
+        })
+    else:
+        # Return JSON instead of redirecting when not authenticated
+        return jsonify({
+            'status': 'unauthenticated',
+            'authenticated': False,
+            'user': None
+        }), 401
 
 @bp.route('/session-test')
 def session_test():
