@@ -6,10 +6,21 @@ from flask_login import LoginManager # Import LoginManager
 # from flask_limiter import Limiter  # Uncomment if you want rate limiting
 # from flask_limiter.util import get_remote_address
 from sqlalchemy import inspect
+import logging
 
 def create_app(test_config=None):
     """Create and configure the Flask application."""
     app = Flask(__name__, static_folder='static')
+    
+    # Configure logging for all environments
+    if not app.debug and not app.testing:
+        # Production logging
+        app.logger.setLevel(logging.INFO)
+        handler = logging.StreamHandler()
+        handler.setLevel(logging.INFO)
+        formatter = logging.Formatter('[%(asctime)s] %(levelname)s in %(module)s: %(message)s')
+        handler.setFormatter(formatter)
+        app.logger.addHandler(handler)
     
     # Load configuration
     if test_config is None:
