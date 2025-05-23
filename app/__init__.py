@@ -38,6 +38,7 @@ def create_app(test_config=None):
             SESSION_COOKIE_SECURE=True,
             SESSION_COOKIE_HTTPONLY=True,
             SESSION_COOKIE_SAMESITE='Lax',
+            SESSION_COOKIE_DOMAIN=None,  # Let Flask determine the domain
             REMEMBER_COOKIE_SECURE=True,
             REMEMBER_COOKIE_HTTPONLY=True,
             REMEMBER_COOKIE_SAMESITE='Lax',
@@ -50,10 +51,18 @@ def create_app(test_config=None):
         # CORS(app, supports_credentials=True, origins=['https://yourfrontend.com'])
         # Uncomment and configure if you want rate limiting
         # limiter = Limiter(app, key_func=get_remote_address, default_limits=["200 per day", "50 per hour"])
+    else:
+        # Development settings - less strict
+        app.config.update(
+            SESSION_COOKIE_SECURE=False,
+            SESSION_COOKIE_HTTPONLY=True,
+            SESSION_COOKIE_SAMESITE='Lax',
+        )
     
     # Configure signed cookie sessions (Flask built-in)
     app.config.update(
         PERMANENT_SESSION_LIFETIME=1800,  # 30 minutes
+        SESSION_COOKIE_NAME='thinkwrapper_session',  # Custom session name
     )
 
     # Initialize extensions

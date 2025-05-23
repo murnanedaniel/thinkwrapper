@@ -30,26 +30,40 @@ def init_auth0(app):
 @bp.route('/login')
 def login():
     """Redirect to Auth0 login page"""
+    # Ensure session persists for Auth0 state parameter
+    session.permanent = True
+    current_app.logger.info(f"Login initiated, session ID: {session.get('_id', 'no-id')}")
     return auth0.authorize_redirect(redirect_uri=AUTH0_CALLBACK_URL)
 
 @bp.route('/callback')
 def callback():
     """Handle the Auth0 callback - get and store tokens, log user in"""
-    token = auth0.authorize_access_token()
-    resp = auth0.get('userinfo')
-    userinfo = resp.json()
+    current_app.logger.info(f"Callback received, session ID: {session.get('_id', 'no-id')}")
+    current_app.logger.info(f"Session keys: {list(session.keys())}")
     
-    # Store Auth0 user info in session
-    session['jwt_payload'] = userinfo
-    
-    # Find or create user
-    user = User.get_or_create_from_auth0(userinfo)
-    
-    # Log user in with Flask-Login
-    login_user(user)
-    
-    # Redirect to dashboard upon successful login
-    return redirect('/dashboard')
+    try:
+        token = auth0.authorize_access_token()
+        resp = auth0.get('userinfo')
+        userinfo = resp.json()
+        
+        # Store Auth0 user info in session
+        session['jwt_payload'] = userinfo
+        session.permanent = True
+        
+        # Find or create user
+        user = User.get_or_create_from_auth0(userinfo)
+        
+        # Log user in with Flask-Login
+        login_user(user)
+        
+        current_app.logger.info(f"Successfully authenticated user: {user.email}")
+        
+        # Redirect to dashboard upon successful login
+        return redirect('/dashboard')
+    except Exception as e:
+        current_app.logger.error(f"Auth callback error: {str(e)}")
+        # Redirect to home with error message
+        return redirect('/?error=auth_failed')
 
 @bp.route('/logout')
 @login_required
@@ -72,6 +86,21 @@ def status():
     return jsonify({
         'status': 'success',
         'user': {'id': current_user.id, 'email': current_user.email}
+    })
+
+@bp.route('/session-test')
+def session_test():
+    """Test route to check session functionality"""
+    if 'test_counter' not in session:
+        session['test_counter'] = 0
+    session['test_counter'] += 1
+    session.permanent = True
+    
+    return jsonify({
+        'session_id': session.get('_id', 'no-id'),
+        'test_counter': session['test_counter'],
+        'session_keys': list(session.keys()),
+        'permanent': session.permanent
     })
 
 @bp.route('/paddle/webhook', methods=['POST'])
