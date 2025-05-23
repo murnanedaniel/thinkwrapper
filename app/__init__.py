@@ -2,7 +2,6 @@ import os
 from flask import Flask
 from .models import db, User # Import User for Flask-Login
 from flask_login import LoginManager # Import LoginManager
-from flask_session import Session # Import Session
 # from flask_cors import CORS  # Uncomment if you need CORS
 # from flask_limiter import Limiter  # Uncomment if you want rate limiting
 # from flask_limiter.util import get_remote_address
@@ -52,16 +51,10 @@ def create_app(test_config=None):
         # Uncomment and configure if you want rate limiting
         # limiter = Limiter(app, key_func=get_remote_address, default_limits=["200 per day", "50 per hour"])
     
-    # Configure session for all environments (helps with Auth0 callback)
+    # Configure signed cookie sessions (Flask built-in)
     app.config.update(
-        SESSION_TYPE='filesystem',
-        SESSION_PERMANENT=False,
         PERMANENT_SESSION_LIFETIME=1800,  # 30 minutes
-        SESSION_USE_SIGNER=True,
     )
-    
-    # Initialize Flask-Session
-    Session(app)
 
     # Initialize extensions
     db.init_app(app)
