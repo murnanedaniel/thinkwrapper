@@ -88,16 +88,16 @@ def create_app(test_config=None):
         if not existing_tables:
             db.create_all()
     
-    # Register routes
-    from . import routes
-    app.register_blueprint(routes.bp)
-    
-    # Import and register auth blueprint
-    from . import auth as auth_bp # Assuming auth.py will exist
+    # Register auth blueprint FIRST (before catch-all routes)
+    from . import auth as auth_bp
     app.register_blueprint(auth_bp.bp, url_prefix='/auth')
     
     # Initialize Auth0
     auth_bp.init_auth0(app)
+    
+    # Register main routes (including catch-all) AFTER auth routes
+    from . import routes
+    app.register_blueprint(routes.bp)
     
     # A simple route to check if the app is running
     @app.route('/health')

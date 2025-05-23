@@ -6,6 +6,7 @@ from .auth0_config import AUTH0_DOMAIN, AUTH0_CLIENT_ID, AUTH0_CLIENT_SECRET, AU
 from authlib.integrations.flask_client import OAuth
 import json
 from urllib.parse import urlencode
+from datetime import datetime
 
 bp = Blueprint('auth', __name__)
 
@@ -32,14 +33,30 @@ def login():
     """Redirect to Auth0 login page"""
     # Ensure session persists for Auth0 state parameter
     session.permanent = True
-    current_app.logger.info(f"Login initiated, session ID: {session.get('_id', 'no-id')}")
+    
+    # Add debugging BEFORE the redirect
+    current_app.logger.info(f"=== LOGIN START ===")
+    current_app.logger.info(f"Session before login: {dict(session)}")
+    current_app.logger.info(f"Session permanent: {session.permanent}")
+    
+    # Store a test value to verify session persistence
+    session['login_timestamp'] = str(datetime.now())
+    
+    current_app.logger.info(f"Session after setting timestamp: {dict(session)}")
+    
     return auth0.authorize_redirect(redirect_uri=AUTH0_CALLBACK_URL)
 
 @bp.route('/callback')
 def callback():
     """Handle the Auth0 callback - get and store tokens, log user in"""
-    current_app.logger.info(f"Callback received, session ID: {session.get('_id', 'no-id')}")
-    current_app.logger.info(f"Session keys: {list(session.keys())}")
+    current_app.logger.info(f"=== CALLBACK START ===")
+    current_app.logger.info(f"Session at callback: {dict(session)}")
+    current_app.logger.info(f"Session permanent: {session.permanent}")
+    current_app.logger.info(f"Login timestamp from session: {session.get('login_timestamp', 'MISSING')}")
+    
+    # Get the state parameter from the request
+    state_from_request = request.args.get('state')
+    current_app.logger.info(f"State from Auth0 callback: {state_from_request}")
     
     try:
         token = auth0.authorize_access_token()
@@ -62,6 +79,7 @@ def callback():
         return redirect('/dashboard')
     except Exception as e:
         current_app.logger.error(f"Auth callback error: {str(e)}")
+        current_app.logger.error(f"Session keys at error: {list(session.keys())}")
         # Redirect to home with error message
         return redirect('/?error=auth_failed')
 
