@@ -73,7 +73,12 @@ def send_email(to_email, subject, content):
         from_email = Email("newsletter@thinkwrapper.com")
         to_email = Email(to_email)
         content = Content("text/html", content)
-        mail = Mail(from_email, subject, to_email, content)
+        mail = Mail(
+            from_email=from_email,
+            to_emails=to_email,
+            subject=subject,
+            html_content=content,
+        )
         
         response = sg.client.mail.send.post(request_body=mail.get())
         return response.status_code in [200, 202]
