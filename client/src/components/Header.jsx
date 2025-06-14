@@ -1,42 +1,63 @@
 import { Link } from 'react-router-dom'
+import { useAuth } from './AuthContext'
+import LoginButton from './Auth0LoginButton'
+import LogoutButton from './Auth0LogoutButton'
 
-function Header({ isLoggedIn, setIsLoggedIn }) {
-  const handleLogout = () => {
-    // In a real app, we would call an API endpoint to logout
-    setIsLoggedIn(false)
+function Header() {
+  const { isAuthenticated, user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <header className="border-b border-gray-100 py-4">
+        <div className="container mx-auto px-4 md:px-8 flex justify-between items-center">
+          <Link to="/" className="text-xl font-normal text-gray-900">
+            ThinkWrapper
+          </Link>
+          <div>Loading...</div>
+        </div>
+      </header>
+    );
   }
 
   return (
-    <header className="header">
-      <div className="container header-container">
-        <Link to="/" className="logo">
+    <header className="border-b border-gray-100 py-4">
+      <div className="container mx-auto px-4 md:px-8 flex justify-between items-center">
+        <Link to="/" className="text-xl font-normal text-gray-900">
           ThinkWrapper
         </Link>
         <nav>
-          <ul>
-            {isLoggedIn ? (
+          <ul className="flex space-x-8 items-center">
+            {isAuthenticated ? (
               <>
                 <li>
-                  <Link to="/dashboard">Dashboard</Link>
+                  <Link 
+                    to="/dashboard" 
+                    className="text-gray-700 hover:text-gray-900"
+                  >
+                    Dashboard
+                  </Link>
                 </li>
                 <li>
-                  <Link to="/create">Create New</Link>
+                  <Link 
+                    to="/create"
+                    className="text-gray-700 hover:text-gray-900"
+                  >
+                    Create New
+                  </Link>
                 </li>
                 <li>
-                  <button onClick={handleLogout} className="btn-link">
-                    Logout
-                  </button>
+                  <span className="text-gray-700 mr-2">
+                    {user?.email}
+                  </span>
+                </li>
+                <li>
+                  <LogoutButton />
                 </li>
               </>
             ) : (
               <>
                 <li>
-                  <Link to="/login">Login</Link>
-                </li>
-                <li>
-                  <Link to="/signup" className="btn btn-primary">
-                    Sign Up
-                  </Link>
+                  <LoginButton />
                 </li>
               </>
             )}

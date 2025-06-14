@@ -25,7 +25,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         # Install additional test dependencies
-        pip install openai==1.3.5 sendgrid==6.10.0 pytest==7.4.3 black==23.11.0 ruff==0.1.6
+        pip install openai==1.3.5 sendgrid==6.10.0 pytest==7.4.3 pytest-cov==4.1.0 black==23.11.0 ruff==0.1.6
     
     - name: Run comprehensive test suite
       run: |
@@ -39,6 +39,17 @@ jobs:
       run: |
         # Even if comprehensive tests fail, core routes must pass
         python scripts/run_tests.py routes
+    
+    - name: Run tests with coverage
+      run: |
+        pytest --cov=app --cov-report=xml --cov-report=html --cov-report=term-missing
+      continue-on-error: false
+    
+    - name: Upload coverage reports to Codecov
+      uses: codecov/codecov-action@v5
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        slug: murnanedaniel/thinkwrapper
         
     - name: Check code formatting
       run: |
