@@ -46,12 +46,10 @@ jobs:
       continue-on-error: false
     
     - name: Upload coverage reports to Codecov
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v5
       with:
-        file: ./coverage.xml
-        flags: unittests
-        name: codecov-umbrella
-        fail_ci_if_error: false
+        token: ${{ secrets.CODECOV_TOKEN }}
+        slug: murnanedaniel/thinkwrapper
         
     - name: Check code formatting
       run: |
