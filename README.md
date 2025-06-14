@@ -1,5 +1,10 @@
 # ThinkWrapper Newsletter Generator
 
+[![Build Status](https://github.com/murnanedaniel/thinkwrapper/workflows/Deploy%20to%20Heroku/badge.svg)](https://github.com/murnanedaniel/thinkwrapper/actions)
+[![codecov](https://codecov.io/gh/murnanedaniel/thinkwrapper/branch/main/graph/badge.svg)](https://codecov.io/gh/murnanedaniel/thinkwrapper)
+[![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 An AI-powered newsletter generation service that allows users to create and schedule automated newsletters on any topic.
 
 ## Features

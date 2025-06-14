@@ -80,6 +80,11 @@ def run_all_tests():
     cmd = "python -m pytest tests/ -v"
     return run_command(cmd, "Running all tests")
 
+def run_coverage_tests():
+    """Run all tests with coverage."""
+    cmd = "python -m pytest tests/ --cov=app --cov-report=html --cov-report=xml --cov-report=term-missing -v"
+    return run_command(cmd, "Running tests with coverage")
+
 def run_linting():
     """Run code linting."""
     commands = [
@@ -134,7 +139,11 @@ def generate_test_report():
     print(f"\n{'🧪 ALL TESTS':-^80}")
     results['all'] = run_all_tests() == 0
     
-    # 4. Code quality
+    # 4. Coverage tests
+    print(f"\n{'📊 COVERAGE TESTS':-^80}")
+    results['coverage'] = run_coverage_tests() == 0
+    
+    # 5. Code quality
     print(f"\n{'🧹 CODE QUALITY':-^80}")
     results['linting'] = run_linting()
     
@@ -167,6 +176,8 @@ def main():
             return run_route_tests()
         elif test_type == 'services':
             return run_service_tests()
+        elif test_type == 'coverage':
+            return run_coverage_tests()
         elif test_type == 'lint':
             return 0 if run_linting() else 1
         elif test_type in ['all', 'full']:
