@@ -74,9 +74,13 @@ The Newsletter Synthesis Service provides powerful backend capabilities for auto
    SENDGRID_API_KEY=your-sendgrid-key
    PADDLE_VENDOR_ID=your-paddle-id
    PADDLE_API_KEY=your-paddle-key
+   PADDLE_WEBHOOK_SECRET=your-webhook-secret
+   PADDLE_SANDBOX=true
    GOOGLE_CLIENT_ID=your-google-oauth-client-id
    GOOGLE_CLIENT_SECRET=your-google-oauth-client-secret
    ```
+
+   For detailed Paddle setup instructions, see [docs/PADDLE_INTEGRATION.md](docs/PADDLE_INTEGRATION.md)
 
    **Getting API Keys:**
    - **Anthropic Claude API**: Sign up at [console.anthropic.com](https://console.anthropic.com) to get your API key
@@ -363,6 +367,9 @@ The app is configured for Heroku deployment:
    heroku config:set BRAVE_SEARCH_API_KEY=your-brave-api-key
    heroku config:set GOOGLE_CLIENT_ID=your-google-client-id
    heroku config:set GOOGLE_CLIENT_SECRET=your-google-client-secret
+   heroku config:set PADDLE_VENDOR_ID=your-paddle-vendor-id
+   heroku config:set PADDLE_API_KEY=your-paddle-api-key
+   heroku config:set PADDLE_WEBHOOK_SECRET=your-paddle-webhook-secret
    # etc.
    ```
 

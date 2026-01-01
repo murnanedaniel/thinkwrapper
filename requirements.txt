@@ -14,4 +14,4 @@ mypy==1.7.1
 celery==5.3.6
 redis==5.0.1
 authlib==1.6.5
-flask-login==0.6.3 
+flask-login==0.6.3
