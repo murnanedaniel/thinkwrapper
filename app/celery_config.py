@@ -36,12 +36,6 @@ def make_celery(app_name=__name__):
         
         # Result backend configuration
         result_expires=3600,  # Results expire after 1 hour
-        result_backend_transport_options={
-            'master_name': 'mymaster',
-            'retry_policy': {
-                'timeout': 5.0
-            }
-        },
         
         # Worker configuration
         worker_prefetch_multiplier=4,

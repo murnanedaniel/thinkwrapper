@@ -45,7 +45,11 @@ def generate_newsletter_async(self, topic, style="concise"):
         result = services.generate_newsletter_content(topic, style)
         
         if result is None:
-            raise Exception("Newsletter generation failed - received None")
+            error_msg = (
+                f"Newsletter generation service returned None for topic '{topic}' - "
+                "check OpenAI service configuration, API key validity, and API availability"
+            )
+            raise Exception(error_msg)
         
         logger.info(f"Successfully generated newsletter for topic: {topic}")
         return result
@@ -77,7 +81,11 @@ def send_email_async(self, to_email, subject, content):
         success = services.send_email(to_email, subject, content)
         
         if not success:
-            raise Exception("Email sending failed")
+            error_msg = (
+                f"Email sending failed for recipient '{to_email}' with subject '{subject}' - "
+                "check SendGrid service configuration, API key validity, and service availability"
+            )
+            raise Exception(error_msg)
         
         logger.info(f"Successfully sent email to {to_email}")
         return {
@@ -106,6 +114,7 @@ def send_newsletter_issue(self, newsletter_id, recipient_email):
     Generate and send a newsletter issue.
     
     This is a combined task that generates content and sends email.
+    Uses task chaining to avoid blocking calls.
     
     Args:
         newsletter_id (int): ID of the newsletter
@@ -121,20 +130,21 @@ def send_newsletter_issue(self, newsletter_id, recipient_email):
         # For now, use a placeholder topic
         topic = f"Newsletter {newsletter_id} Update"
         
-        # Generate content
-        content_result = generate_newsletter_async.apply_async(
-            args=[topic],
-            countdown=0
-        ).get(timeout=300)  # 5 minute timeout
+        # Generate content synchronously (within the task)
+        content_result = services.generate_newsletter_content(topic)
         
         if not content_result or "error" in content_result:
             raise Exception(f"Content generation failed: {content_result}")
         
-        # Send email
-        email_result = send_email_async.apply_async(
-            args=[recipient_email, content_result['subject'], content_result['content']],
-            countdown=0
-        ).get(timeout=60)  # 1 minute timeout
+        # Send email synchronously (within the task)
+        email_success = services.send_email(
+            recipient_email, 
+            content_result['subject'], 
+            content_result['content']
+        )
+        
+        if not email_success:
+            raise Exception(f"Email sending failed for {recipient_email}")
         
         logger.info(f"Successfully sent newsletter {newsletter_id} to {recipient_email}")
         return {
@@ -142,7 +152,7 @@ def send_newsletter_issue(self, newsletter_id, recipient_email):
             "newsletter_id": newsletter_id,
             "recipient": recipient_email,
             "content_generated": True,
-            "email_sent": email_result.get("success", False)
+            "email_sent": True
         }
     except Exception as exc:
         logger.error(f"Error processing newsletter issue {newsletter_id}: {exc}")

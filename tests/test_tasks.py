@@ -48,7 +48,7 @@ class TestNewsletterGenerationTask:
         mock_generate.return_value = None
         
         # The task should raise an exception when service returns None
-        with pytest.raises(Exception, match="Newsletter generation failed"):
+        with pytest.raises(Exception, match="Newsletter generation service returned None"):
             result = generate_newsletter_async("Test Topic")
             # If it doesn't raise immediately, the retry will raise
             if result and 'error' in result:
@@ -99,24 +99,18 @@ class TestEmailSendingTask:
 class TestNewsletterIssueTask:
     """Test combined newsletter generation and sending task."""
     
-    @patch('app.tasks.send_email_async')
-    @patch('app.tasks.generate_newsletter_async')
+    @patch('app.tasks.services.send_email')
+    @patch('app.tasks.services.generate_newsletter_content')
     def test_send_newsletter_issue_success(self, mock_generate, mock_send):
         """Test successful newsletter issue processing."""
         from app.tasks import send_newsletter_issue
         
-        # Mock AsyncResult for generate task
-        mock_generate_result = Mock()
-        mock_generate_result.get.return_value = {
+        # Mock the service calls directly
+        mock_generate.return_value = {
             'subject': 'Newsletter Subject',
             'content': 'Newsletter Content'
         }
-        mock_generate.apply_async.return_value = mock_generate_result
-        
-        # Mock AsyncResult for send task
-        mock_send_result = Mock()
-        mock_send_result.get.return_value = {'success': True}
-        mock_send.apply_async.return_value = mock_send_result
+        mock_send.return_value = True
         
         result = send_newsletter_issue(123, "user@example.com")
         
@@ -125,6 +119,14 @@ class TestNewsletterIssueTask:
         assert result['recipient'] == "user@example.com"
         assert result['content_generated'] is True
         assert result['email_sent'] is True
+        
+        # Verify services were called
+        mock_generate.assert_called_once()
+        mock_send.assert_called_once_with(
+            "user@example.com",
+            "Newsletter Subject",
+            "Newsletter Content"
+        )
 
 
 class TestPeriodicTasks:
