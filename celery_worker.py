@@ -20,4 +20,5 @@ import sys
 from app.celery_config import celery
 
 if __name__ == '__main__':
-    celery.start()
+    # Remove script name from arguments
+    celery.start(argv=sys.argv[1:] if len(sys.argv) > 1 else ['worker', '--help'])
