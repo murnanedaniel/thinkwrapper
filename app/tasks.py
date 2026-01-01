@@ -1,6 +1,6 @@
 """Celery tasks for background processing."""
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from celery import Task
 from celery.exceptions import MaxRetriesExceededError
 from app.celery_config import celery
@@ -84,7 +84,7 @@ def send_email_async(self, to_email, subject, content):
             "success": True,
             "to_email": to_email,
             "subject": subject,
-            "sent_at": datetime.utcnow().isoformat()
+            "sent_at": datetime.now(timezone.utc).isoformat()
         }
     except Exception as exc:
         logger.error(f"Error sending email to {to_email}: {exc}")
@@ -204,7 +204,7 @@ def check_scheduled_newsletters():
             "success": True,
             "checked": checked_count,
             "sent": sent_count,
-            "checked_at": datetime.utcnow().isoformat()
+            "checked_at": datetime.now(timezone.utc).isoformat()
         }
     except Exception as exc:
         logger.error(f"Error checking scheduled newsletters: {exc}")
@@ -228,7 +228,7 @@ def cleanup_old_results():
         logger.info("Starting cleanup of old task results...")
         
         # Get task results older than 24 hours
-        cutoff_time = datetime.utcnow() - timedelta(hours=24)
+        cutoff_time = datetime.now(timezone.utc) - timedelta(hours=24)
         
         # In production, you might want to use Celery's result backend inspection
         # or implement custom cleanup based on your storage backend
@@ -239,7 +239,7 @@ def cleanup_old_results():
         logger.info("Cleanup complete")
         return {
             "success": True,
-            "cleaned_at": datetime.utcnow().isoformat(),
+            "cleaned_at": datetime.now(timezone.utc).isoformat(),
             "message": "Automatic cleanup via result_expires configuration"
         }
     except Exception as exc:
@@ -283,7 +283,7 @@ def example_notification_task(self, user_id, message):
             "success": True,
             "user_id": user_id,
             "message": message,
-            "sent_at": datetime.utcnow().isoformat()
+            "sent_at": datetime.now(timezone.utc).isoformat()
         }
     except Exception as exc:
         logger.error(f"Error sending notification to user {user_id}: {exc}")
@@ -324,7 +324,7 @@ def example_api_call_task(self, endpoint, method="GET", data=None):
             "success": True,
             "endpoint": endpoint,
             "method": method,
-            "completed_at": datetime.utcnow().isoformat()
+            "completed_at": datetime.now(timezone.utc).isoformat()
         }
     except Exception as exc:
         logger.error(f"Error making API call to {endpoint}: {exc}")

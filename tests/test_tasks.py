@@ -47,15 +47,12 @@ class TestNewsletterGenerationTask:
         
         mock_generate.return_value = None
         
-        # Create a mock task instance
-        mock_task = MagicMock()
-        mock_task.request.retries = 0
-        mock_task.retry.side_effect = Exception("Retry")
-        
-        with patch.object(generate_newsletter_async, 'request'):
-            with patch.object(generate_newsletter_async, 'retry', side_effect=Exception("Retry")):
-                with pytest.raises(Exception):
-                    generate_newsletter_async("Test Topic")
+        # The task should raise an exception when service returns None
+        with pytest.raises(Exception, match="Newsletter generation failed"):
+            result = generate_newsletter_async("Test Topic")
+            # If it doesn't raise immediately, the retry will raise
+            if result and 'error' in result:
+                pass  # Max retries exceeded returns error dict
 
 
 class TestEmailSendingTask:
@@ -91,15 +88,12 @@ class TestEmailSendingTask:
         
         mock_send.return_value = False
         
-        # Mock the retry mechanism
-        mock_task = MagicMock()
-        mock_task.request.retries = 0
-        mock_task.retry.side_effect = Exception("Retry")
-        
-        with patch.object(send_email_async, 'request'):
-            with patch.object(send_email_async, 'retry', side_effect=Exception("Retry")):
-                with pytest.raises(Exception):
-                    send_email_async("test@example.com", "Subject", "Content")
+        # The task should raise an exception when email sending fails
+        with pytest.raises(Exception, match="Email sending failed"):
+            result = send_email_async("test@example.com", "Subject", "Content")
+            # If it doesn't raise immediately, the retry will raise
+            if result and not result.get('success'):
+                pass  # Max retries exceeded returns error dict
 
 
 class TestNewsletterIssueTask:
