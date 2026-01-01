@@ -23,7 +23,6 @@ class TestPaddlePaymentService:
     @pytest.fixture
     def payment_service(self):
         """Create a payment service instance with test credentials."""
-        from app import create_app
         app = create_app({'TESTING': True})
         with app.app_context():
             with patch.dict('os.environ', {
