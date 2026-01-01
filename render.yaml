@@ -1,0 +1,92 @@
+services:
+  # Web Service (Flask API + React Frontend)
+  - type: web
+    name: thinkwrapper-web
+    runtime: python
+    env: python
+    region: oregon
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn "app:create_app()"
+    healthCheckPath: /health
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: thinkwrapper-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: thinkwrapper-redis
+          property: connectionString
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: BRAVE_SEARCH_API_KEY
+        sync: false
+      - key: SENDGRID_API_KEY
+        sync: false
+      - key: PADDLE_VENDOR_ID
+        sync: false
+      - key: PADDLE_API_KEY
+        sync: false
+      - key: PADDLE_PUBLIC_KEY
+        sync: false
+      - key: PADDLE_WEBHOOK_SECRET
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: CORS_ORIGINS
+        value: https://thinkwrapper-web.onrender.com
+
+  # Celery Worker (for async tasks)
+  # NOTE: Disabled until Celery Task Queue Setup (Issue #06) is completed.
+  # Uncomment when app/celery_app.py is implemented.
+  # - type: worker
+  #   name: thinkwrapper-worker
+  #   runtime: python
+  #   env: python
+  #   region: oregon
+  #   plan: starter
+  #   buildCommand: pip install -r requirements.txt
+  #   startCommand: celery -A app.celery_app worker --loglevel=info
+  #   envVars:
+  #     - key: FLASK_ENV
+  #       value: production
+  #     - key: DATABASE_URL
+  #       fromDatabase:
+  #         name: thinkwrapper-db
+  #         property: connectionString
+  #     - key: REDIS_URL
+  #       fromService:
+  #         type: redis
+  #         name: thinkwrapper-redis
+  #         property: connectionString
+  #     - key: ANTHROPIC_API_KEY
+  #       sync: false
+  #     - key: BRAVE_SEARCH_API_KEY
+  #       sync: false
+  #     - key: SENDGRID_API_KEY
+  #       sync: false
+
+  # Redis (for Celery broker/backend)
+  - type: redis
+    name: thinkwrapper-redis
+    region: oregon
+    plan: starter
+    maxmemoryPolicy: noeviction
+    ipAllowList: []
+
+databases:
+  # PostgreSQL Database (or use Supabase external connection)
+  - name: thinkwrapper-db
+    databaseName: thinkwrapper
+    region: oregon
+    plan: starter
+    # Note: You can also use Supabase instead by removing this and setting
+    # DATABASE_URL as a secret environment variable

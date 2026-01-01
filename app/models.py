@@ -1,43 +1,60 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
+from flask_login import UserMixin
+from . import db
 
-Base = declarative_base()
 
-class User(Base):
-    __tablename__ = 'users'
-    
-    id = Column(Integer, primary_key=True)
-    email = Column(String(254), unique=True, nullable=False)
-    subscription_id = Column(String(128), nullable=True)  # Paddle subscription ID
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    
-    newsletters = relationship("Newsletter", back_populates="user")
+class User(UserMixin, db.Model):
+    __tablename__ = "users"
 
-class Newsletter(Base):
-    __tablename__ = 'newsletters'
-    
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-    name = Column(String(100), nullable=False)
-    topic = Column(String(100), nullable=False)
-    schedule = Column(String(50), nullable=True)  # cron expression
-    last_sent_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    
-    user = relationship("User", back_populates="newsletters")
-    issues = relationship("Issue", back_populates="newsletter")
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(254), unique=True, nullable=False)
+    google_id = db.Column(db.String(128), unique=True, nullable=True)
+    name = db.Column(db.String(100), nullable=True)
+    profile_pic = db.Column(db.String(500), nullable=True)
+    subscription_id = db.Column(db.String(128), nullable=True)  # Paddle subscription ID
+    subscription_status = db.Column(
+        db.String(50), default="none"
+    )  # none, active, cancelled, past_due
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-class Issue(Base):
-    __tablename__ = 'issues'
-    
-    id = Column(Integer, primary_key=True)
-    newsletter_id = Column(Integer, ForeignKey('newsletters.id'), nullable=False)
-    subject = Column(String(200), nullable=False)
-    content = Column(Text, nullable=False)
-    sent_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    
-    newsletter = relationship("Newsletter", back_populates="issues") 
+    # Cascade behavior: Deleting a user will delete all their newsletters.
+    # Since Newsletter also cascades to Issue records, this creates a nested
+    # cascade where deleting a user will delete all their newsletters AND all
+    # issues associated with those newsletters.
+    newsletters = db.relationship(
+        "Newsletter", back_populates="user", cascade="all, delete-orphan"
+    )
+
+
+class Newsletter(db.Model):
+    __tablename__ = "newsletters"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    name = db.Column(db.String(100), nullable=False)
+    topic = db.Column(db.String(100), nullable=False)
+    schedule = db.Column(db.String(50), nullable=True)  # cron expression
+    is_active = db.Column(db.Boolean, default=True)
+    last_sent_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship("User", back_populates="newsletters")
+    issues = db.relationship(
+        "Issue", back_populates="newsletter", cascade="all, delete-orphan"
+    )
+
+
+class Issue(db.Model):
+    __tablename__ = "issues"
+
+    id = db.Column(db.Integer, primary_key=True)
+    newsletter_id = db.Column(
+        db.Integer, db.ForeignKey("newsletters.id"), nullable=False
+    )
+    subject = db.Column(db.String(200), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    sent_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    newsletter = db.relationship("Newsletter", back_populates="issues")
