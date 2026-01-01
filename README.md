@@ -9,6 +9,7 @@ An AI-powered newsletter generation service that allows users to create and sche
 - Modern React frontend
 - Flask API backend
 - Subscription management with Paddle
+- **Google OAuth authentication for secure login**
 
 ## Tech Stack
 
