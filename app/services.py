@@ -1,11 +1,16 @@
 import os
-import openai
+from openai import OpenAI
 from flask import current_app
 import sendgrid
-from sendgrid.helpers.mail import Mail, Email, Content
+from sendgrid.helpers.mail import Mail, From, To, Content
 
-# Configure OpenAI client
-openai.api_key = os.environ.get('OPENAI_API_KEY')
+# Configure OpenAI client (lazy initialization to avoid errors during testing)
+def get_openai_client():
+    """Get or create OpenAI client instance."""
+    api_key = os.environ.get('OPENAI_API_KEY')
+    if api_key:
+        return OpenAI(api_key=api_key)
+    return None
 
 def generate_newsletter_content(topic, style="concise"):
     """
@@ -28,15 +33,25 @@ def generate_newsletter_content(topic, style="concise"):
     """
     
     try:
-        response = openai.Completion.create(
+        # Get OpenAI client
+        client = get_openai_client()
+        if not client:
+            current_app.logger.error("OpenAI API key not configured")
+            return None
+        
+        # Using OpenAI v1.0+ API
+        response = client.chat.completions.create(
             model="gpt-4",
-            prompt=prompt,
+            messages=[
+                {"role": "system", "content": "You are a newsletter writer."},
+                {"role": "user", "content": prompt}
+            ],
             max_tokens=1500,
             temperature=0.7
         )
         
         # Process response to extract subject and content
-        content = response.choices[0].text.strip()
+        content = response.choices[0].message.content.strip()
         
         # Simple extraction of subject line (first line)
         lines = content.split('\n')
@@ -70,10 +85,10 @@ def send_email(to_email, subject, content):
         
     try:
         sg = sendgrid.SendGridAPIClient(api_key=sg_api_key)
-        from_email = Email("newsletter@thinkwrapper.com")
-        to_email = Email(to_email)
-        content = Content("text/html", content)
-        mail = Mail(from_email, subject, to_email, content)
+        from_email_obj = From("newsletter@thinkwrapper.com")
+        to_email_obj = To(to_email)
+        content_obj = Content("text/html", content)
+        mail = Mail(from_email_obj, to_email_obj, subject, content_obj)
         
         response = sg.client.mail.send.post(request_body=mail.get())
         return response.status_code in [200, 202]
