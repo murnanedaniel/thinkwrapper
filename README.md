@@ -5,6 +5,7 @@ An AI-powered newsletter generation service that allows users to create and sche
 ## Features
 
 - Generate AI-written newsletters using OpenAI
+- **Web search integration with Brave Search API**
 - Schedule regular newsletter delivery
 - Modern React frontend
 - Flask API backend
@@ -46,6 +47,7 @@ An AI-powered newsletter generation service that allows users to create and sche
    ```
    FLASK_ENV=development
    OPENAI_API_KEY=your-api-key
+   BRAVE_SEARCH_API_KEY=your-brave-api-key
    DATABASE_URL=postgresql://username:password@localhost:5432/thinkwrapper
    SENDGRID_API_KEY=your-sendgrid-key
    PADDLE_VENDOR_ID=your-paddle-id
@@ -72,6 +74,89 @@ An AI-powered newsletter generation service that allows users to create and sche
 
 3. Access the frontend at http://localhost:5173
 
+## Brave Search API Integration
+
+ThinkWrapper integrates with the Brave Search API to provide web search results for newsletter content generation.
+
+### Obtaining a Brave Search API Key
+
+1. Visit the [Brave Search API website](https://brave.com/search/api/)
+2. Sign up for a free or paid account (free tier includes up to 2,000 queries per month)
+3. Navigate to your dashboard and generate an API key
+4. Copy the API key for use in your environment configuration
+
+### Configuring Brave Search API
+
+Add your Brave Search API key to your `.env` file:
+
+```
+BRAVE_SEARCH_API_KEY=your-brave-api-key-here
+```
+
+Or set it as an environment variable in your deployment environment:
+
+```bash
+export BRAVE_SEARCH_API_KEY=your-brave-api-key-here
+```
+
+### Using Brave Search in Your Application
+
+The Brave Search integration is available through the `search_brave()` function in `app/services.py`:
+
+```python
+from app.services import search_brave
+
+# Basic search
+results = search_brave("artificial intelligence", count=10)
+
+# Check if search was successful
+if results['success']:
+    for result in results['results']:
+        print(f"Title: {result['title']}")
+        print(f"URL: {result['url']}")
+        print(f"Description: {result['description']}")
+else:
+    print(f"Search failed: {results['error']}")
+```
+
+### Fallback Mechanism
+
+The Brave Search integration includes a built-in fallback mechanism:
+
+- **Missing API Key**: If no API key is configured, the system automatically falls back to mock search results
+- **API Errors**: If the Brave API returns an error (e.g., rate limit exceeded, server error), the system falls back to mock results
+- **Network Timeouts**: If the API request times out, the system falls back to mock results
+- **Disable Fallback**: You can disable the fallback by setting `fallback_to_mock=False`:
+
+```python
+# No fallback - will return error if API fails
+results = search_brave("query", fallback_to_mock=False)
+```
+
+### API Usage Monitoring
+
+All Brave Search API requests and responses are automatically logged for quota monitoring:
+
+- Request logs include: timestamp, query, and result count
+- Response logs include: timestamp, status code, and query
+- Logs are written using Flask's standard logging system
+- Check your application logs to monitor API usage
+
+### Testing
+
+Run the Brave Search integration tests:
+
+```bash
+pytest tests/test_brave_search.py -v
+```
+
+The test suite includes:
+- Successful API calls
+- Error handling and fallback mechanisms
+- Results parsing
+- Logging functionality
+- Mock data generation
+
 ## Deployment
 
 The app is configured for Heroku deployment:
@@ -91,6 +176,7 @@ The app is configured for Heroku deployment:
    ```bash
    heroku config:set FLASK_ENV=production
    heroku config:set OPENAI_API_KEY=your-api-key
+   heroku config:set BRAVE_SEARCH_API_KEY=your-brave-api-key
    # etc.
    ```
 
