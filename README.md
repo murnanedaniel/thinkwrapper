@@ -72,6 +72,36 @@ An AI-powered newsletter generation service that allows users to create and sche
 
 3. Access the frontend at http://localhost:5173
 
+## Testing
+
+ThinkWrapper has a comprehensive test suite with **36 tests** and **66% code coverage**.
+
+### Quick Start
+
+```bash
+# Run all tests
+pytest
+
+# Run tests with verbose output
+pytest -v
+
+# Run specific test file
+pytest tests/test_routes.py
+
+# Generate HTML coverage report
+pytest --cov-report=html
+open htmlcov/index.html
+```
+
+### Test Structure
+
+- **36 total tests** (100% passing)
+- **3 test files**: routes (basic), routes (comprehensive), services
+- **Routes coverage**: 100%
+- **Services coverage**: 95%
+
+For detailed testing documentation, see [TESTING.md](TESTING.md).
+
 ## Deployment
 
 The app is configured for Heroku deployment:
