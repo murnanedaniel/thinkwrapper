@@ -26,6 +26,7 @@ jobs:
         pip install -r requirements.txt
 
     - name: Validate environment template
+      if: ${{ false }}  # Skip in CI - requires actual environment variables
       run: |
         python scripts/validate_env.py
       continue-on-error: true
