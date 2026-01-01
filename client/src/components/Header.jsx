@@ -1,9 +1,15 @@
 import { Link } from 'react-router-dom'
 
-function Header({ isLoggedIn, setIsLoggedIn }) {
+function Header({ isLoggedIn, setIsLoggedIn, user, setUser }) {
   const handleLogout = () => {
-    // In a real app, we would call an API endpoint to logout
-    setIsLoggedIn(false)
+    // Call the backend logout endpoint
+    fetch('/api/auth/logout')
+      .then(() => {
+        setIsLoggedIn(false)
+        setUser(null)
+        window.location.href = '/'
+      })
+      .catch(err => console.error('Logout error:', err))
   }
 
   return (
@@ -23,6 +29,9 @@ function Header({ isLoggedIn, setIsLoggedIn }) {
                   <Link to="/create">Create New</Link>
                 </li>
                 <li>
+                  <span className="user-name">{user?.name || user?.email}</span>
+                </li>
+                <li>
                   <button onClick={handleLogout} className="btn-link">
                     Logout
                   </button>
@@ -34,7 +43,7 @@ function Header({ isLoggedIn, setIsLoggedIn }) {
                   <Link to="/login">Login</Link>
                 </li>
                 <li>
-                  <Link to="/signup" className="btn btn-primary">
+                  <Link to="/login" className="btn btn-primary">
                     Sign Up
                   </Link>
                 </li>
