@@ -4,11 +4,29 @@ An AI-powered newsletter generation service that allows users to create and sche
 
 ## Features
 
-- Generate AI-written newsletters using OpenAI
-- Schedule regular newsletter delivery
-- Modern React frontend
-- Flask API backend
-- Subscription management with Paddle
+- **Generate AI-written newsletters** using OpenAI
+- **Newsletter Synthesis Service** - Collect, transform and synthesize content into newsletters
+- **Multiple Rendering Formats** - Plain text and HTML output
+- **Schedule regular newsletter delivery**
+- **On-demand admin controls** for newsletter generation
+- **Modern React frontend**
+- **Flask API backend**
+- **Subscription management** with Paddle
+
+## New: Newsletter Synthesis Service
+
+The Newsletter Synthesis Service provides powerful backend capabilities for automated newsletter generation:
+
+- Collect and transform source content into newsletter summaries
+- AI-powered content synthesis with OpenAI integration
+- Pluggable rendering system (plain text, HTML)
+- Admin API endpoints for on-demand generation
+- Configurable settings for schedule and delivery format
+- Email distribution via SendGrid
+
+📚 **See [NEWSLETTER_SERVICE_DOCS.md](NEWSLETTER_SERVICE_DOCS.md) for complete documentation**
+
+🚀 **Try the demo**: `python demo_newsletter_service.py`
 
 ## Tech Stack
 

@@ -5,20 +5,25 @@ Demo script for the Newsletter Synthesis Service
 This script demonstrates the end-to-end functionality of the newsletter
 synthesis service, including content generation, rendering, and previewing
 the output.
+
+Run from the repository root: python demo_newsletter_service.py
 """
 
 import os
-import sys
 from datetime import datetime
 
-# Add parent directory to path for imports
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from app.newsletter_synthesis import (
-    NewsletterSynthesizer,
-    NewsletterRenderer,
-    NewsletterConfig
-)
+# Import from installed package
+try:
+    from app.newsletter_synthesis import (
+        NewsletterSynthesizer,
+        NewsletterRenderer,
+        NewsletterConfig
+    )
+except ImportError:
+    print("Error: Unable to import app modules.")
+    print("Please run this script from the repository root directory:")
+    print("  python demo_newsletter_service.py")
+    exit(1)
 
 
 def print_section(title):
