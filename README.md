@@ -1,103 +1,198 @@
 # ThinkWrapper Newsletter Generator
 
-An AI-powered newsletter generation service that allows users to create and schedule automated newsletters on any topic.
+An AI-powered newsletter generation service that uses Anthropic Claude and Brave Search to create and schedule automated newsletters on any topic.
 
 ## Features
 
-- Generate AI-written newsletters using OpenAI
-- Schedule regular newsletter delivery
-- Modern React frontend
-- Flask API backend
-- Subscription management with Paddle
+- 🤖 AI-powered newsletter generation using Anthropic Claude Deep Research
+- 🔍 Web research integration via Brave Search API
+- 📧 Automated newsletter delivery via SendGrid
+- 🔐 Google OAuth authentication
+- 💳 Subscription management with Paddle
+- ⚡ Async task processing with Celery
+- 📱 Modern React frontend (Vite)
+- 🚀 Production-ready Flask backend
 
 ## Tech Stack
 
 - **Backend**: Flask 3 + Gunicorn
-- **Database**: PostgreSQL
+- **Database**: PostgreSQL (Supabase or Render)
+- **Cache/Queue**: Redis + Celery
 - **Frontend**: React 18 (Vite) SPA
+- **AI**: Anthropic Claude API
+- **Search**: Brave Search API
 - **Email**: SendGrid
+- **Auth**: Google OAuth 2.0
 - **Payments**: Paddle
-- **Deployment**: Heroku
+- **Deployment**: Render
 
-## Development Setup
+## Quick Start
 
 ### Prerequisites
 
 - Python 3.12+
 - Node.js 18+
-- PostgreSQL (local or remote instance)
+- PostgreSQL (or Supabase account)
+- Redis (optional for local development)
 
-### Backend Setup
+### 1. Clone and Setup
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/yourusername/thinkwrapper.git
-   cd thinkwrapper
-   ```
+```bash
+git clone https://github.com/murnanedaniel/thinkwrapper.git
+cd thinkwrapper
+```
 
-2. Create a Python virtual environment and install dependencies:
-   ```bash
-   python -m venv .venv
-   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-   pip install -r requirements.txt
-   ```
+### 2. Backend Setup
 
-3. Set up environment variables (create a `.env` file in project root):
-   ```
-   FLASK_ENV=development
-   OPENAI_API_KEY=your-api-key
-   DATABASE_URL=postgresql://username:password@localhost:5432/thinkwrapper
-   SENDGRID_API_KEY=your-sendgrid-key
-   PADDLE_VENDOR_ID=your-paddle-id
-   PADDLE_API_KEY=your-paddle-key
-   ```
+```bash
+# Create virtual environment
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
-4. Run the Flask development server:
-   ```bash
-   flask --app app run --debug
-   ```
+# Install dependencies
+pip install -r requirements.txt
+```
 
-### Frontend Setup
+### 3. Environment Configuration
 
-1. Install frontend dependencies:
-   ```bash
-   cd client
-   npm install
-   ```
+```bash
+# Copy template and configure
+cp .env.template .env
 
-2. Start the Vite development server:
-   ```bash
-   npm run dev
-   ```
+# Edit .env and add your API keys
+# See .env.template for all required variables
+```
 
-3. Access the frontend at http://localhost:5173
+**Required API Keys:**
+- `ANTHROPIC_API_KEY` - Get from [Anthropic Console](https://console.anthropic.com/)
+- `BRAVE_SEARCH_API_KEY` - Get from [Brave Search API](https://brave.com/search/api/)
+- `GOOGLE_CLIENT_ID` & `GOOGLE_CLIENT_SECRET` - From [Google Cloud Console](https://console.cloud.google.com/)
+- `DATABASE_URL` - Supabase connection string or local PostgreSQL
 
-## Deployment
+### 4. Database Setup
 
-The app is configured for Heroku deployment:
+```bash
+# Initialize database migrations
+flask --app app db init
+flask --app app db migrate -m "Initial migration"
+flask --app app db upgrade
+```
 
-1. Create a Heroku app:
-   ```bash
-   heroku create thinkwrapper-app
-   ```
+### 5. Run Development Server
 
-2. Add required add-ons:
-   ```bash
-   heroku addons:create heroku-postgresql:mini
-   heroku addons:create sendgrid:starter
-   ```
+```bash
+# Terminal 1: Flask backend
+flask --app app run --debug
 
-3. Set environment variables:
-   ```bash
-   heroku config:set FLASK_ENV=production
-   heroku config:set OPENAI_API_KEY=your-api-key
-   # etc.
-   ```
+# Terminal 2: React frontend
+cd client
+npm install
+npm run dev
 
-4. Deploy:
-   ```bash
-   git push heroku main
-   ```
+# Terminal 3 (optional): Celery worker
+celery -A app.celery_app worker --loglevel=info
+```
+
+Access the app at **http://localhost:5173**
+
+## Deployment to Render
+
+### Automatic Deployment (Recommended)
+
+1. Fork this repository
+2. Sign up at [render.com](https://render.com)
+3. Click **New → Blueprint**
+4. Connect your GitHub repository
+5. Render auto-detects `render.yaml` and creates:
+   - Web service (Flask + React)
+   - PostgreSQL database
+   - Redis instance
+   - Celery worker
+
+6. Add environment variables in Render dashboard (see `.env.template`)
+
+### Using Supabase for Database
+
+1. Create project at [supabase.com](https://supabase.com)
+2. Get connection string: Settings → Database → Connection String (URI)
+3. In `render.yaml`, remove the database section
+4. Set `DATABASE_URL` as secret environment variable in Render
+
+## Development
+
+### Running Tests
+
+```bash
+# All tests
+python scripts/run_tests.py full
+
+# Route tests only
+python scripts/run_tests.py routes
+
+# Specific test file
+pytest tests/test_services.py -v
+```
+
+### Code Quality
+
+```bash
+# Format code
+black app/ tests/ scripts/
+
+# Lint
+ruff check .
+
+# Validate environment
+python scripts/validate_env.py
+```
+
+### Database Migrations
+
+```bash
+# Create migration
+flask --app app db migrate -m "Description"
+
+# Apply migrations
+flask --app app db upgrade
+
+# Rollback
+flask --app app db downgrade
+```
+
+## Project Structure
+
+```
+thinkwrapper/
+├── app/
+│   ├── __init__.py       # Flask app factory
+│   ├── config.py         # Configuration classes
+│   ├── models.py         # Database models
+│   ├── routes.py         # API routes
+│   └── services.py       # Business logic
+├── client/               # React frontend
+│   ├── src/
+│   └── package.json
+├── tests/                # Test suite
+├── scripts/              # Utility scripts
+├── .env.template         # Environment template
+├── render.yaml           # Render deployment
+└── requirements.txt      # Python dependencies
+```
+
+## Contributing
+
+See GitHub issues for features being developed. Each issue represents a parallelizable unit of work.
+
+### Current Development Roadmap
+
+Major features tracked in GitHub issues:
+1. Anthropic Deep Research API integration
+2. Brave Search API integration
+3. Newsletter synthesis service
+4. Google OAuth authentication
+5. Paddle payment integration
+6. Celery task queue setup
+7. Comprehensive test suite
 
 ## License
 
