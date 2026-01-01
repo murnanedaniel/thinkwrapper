@@ -13,6 +13,7 @@ An AI-powered newsletter generation service that allows users to create and sche
 ## Tech Stack
 
 - **Backend**: Flask 3 + Gunicorn
+- **Task Queue**: Celery with Redis
 - **Database**: PostgreSQL
 - **Frontend**: React 18 (Vite) SPA
 - **Email**: SendGrid
@@ -26,6 +27,7 @@ An AI-powered newsletter generation service that allows users to create and sche
 - Python 3.12+
 - Node.js 18+
 - PostgreSQL (local or remote instance)
+- Redis (for Celery task queue)
 
 ### Backend Setup
 
@@ -50,11 +52,33 @@ An AI-powered newsletter generation service that allows users to create and sche
    SENDGRID_API_KEY=your-sendgrid-key
    PADDLE_VENDOR_ID=your-paddle-id
    PADDLE_API_KEY=your-paddle-key
+   REDIS_URL=redis://localhost:6379/0
    ```
 
-4. Run the Flask development server:
+4. Install and start Redis (required for Celery):
+   ```bash
+   # macOS
+   brew install redis
+   brew services start redis
+   
+   # Ubuntu/Debian
+   sudo apt-get install redis-server
+   sudo systemctl start redis
+   ```
+
+5. Run the Flask development server:
    ```bash
    flask --app app run --debug
+   ```
+
+6. Start Celery worker (in a separate terminal):
+   ```bash
+   python celery_worker.py worker --loglevel=info
+   ```
+
+7. (Optional) Start Celery beat for periodic tasks (in another terminal):
+   ```bash
+   python celery_worker.py beat --loglevel=info
    ```
 
 ### Frontend Setup
@@ -85,6 +109,7 @@ The app is configured for Heroku deployment:
    ```bash
    heroku addons:create heroku-postgresql:mini
    heroku addons:create sendgrid:starter
+   heroku addons:create heroku-redis:mini
    ```
 
 3. Set environment variables:
@@ -98,6 +123,20 @@ The app is configured for Heroku deployment:
    ```bash
    git push heroku main
    ```
+
+5. Scale worker dynos:
+   ```bash
+   heroku ps:scale web=1 worker=1 beat=1
+   ```
+
+## Background Tasks
+
+ThinkWrapper uses Celery for background task processing. See [CELERY.md](CELERY.md) for detailed documentation on:
+
+- Setting up and running Celery workers
+- Available tasks (newsletter generation, email sending, etc.)
+- Monitoring and troubleshooting
+- Production deployment guidelines
 
 ## License
 
