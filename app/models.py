@@ -2,14 +2,20 @@ from datetime import datetime
 from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
+from flask_login import UserMixin
 
 Base = declarative_base()
 
-class User(Base):
+class User(Base, UserMixin):
     __tablename__ = 'users'
     
     id = Column(Integer, primary_key=True)
     email = Column(String(254), unique=True, nullable=False)
+    name = Column(String(255), nullable=True)
+    # OAuth fields
+    oauth_provider = Column(String(50), nullable=True)  # e.g., 'google'
+    oauth_id = Column(String(255), nullable=True)  # Provider's unique user ID
+    # Subscription
     subscription_id = Column(String(128), nullable=True)  # Paddle subscription ID
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
