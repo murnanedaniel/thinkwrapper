@@ -50,7 +50,11 @@ An AI-powered newsletter generation service that allows users to create and sche
    SENDGRID_API_KEY=your-sendgrid-key
    PADDLE_VENDOR_ID=your-paddle-id
    PADDLE_API_KEY=your-paddle-key
+   PADDLE_WEBHOOK_SECRET=your-webhook-secret
+   PADDLE_SANDBOX=true
    ```
+   
+   For detailed Paddle setup instructions, see [docs/PADDLE_INTEGRATION.md](docs/PADDLE_INTEGRATION.md)
 
 4. Run the Flask development server:
    ```bash
