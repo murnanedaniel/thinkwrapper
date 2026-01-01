@@ -2,7 +2,6 @@
 """Validate environment configuration for ThinkWrapper."""
 import os
 import sys
-from pathlib import Path
 
 # Color codes for terminal output
 GREEN = "\033[92m"
@@ -58,38 +57,40 @@ def main():
 
     # Flask Configuration
     print("Flask Configuration:")
-    all_valid &= check_env_var("FLASK_ENV", required=False)
-    all_valid &= check_env_var("SECRET_KEY", required=True, for_env="production")
+    all_valid = all_valid and check_env_var("FLASK_ENV", required=False)
+    all_valid = all_valid and check_env_var(
+        "SECRET_KEY", required=True, for_env="production"
+    )
 
     # Database
     print("\nDatabase:")
-    all_valid &= check_env_var("DATABASE_URL", required=True)
+    all_valid = all_valid and check_env_var("DATABASE_URL", required=True)
 
     # Redis (for Celery)
     print("\nRedis:")
-    all_valid &= check_env_var("REDIS_URL", required=False)
+    all_valid = all_valid and check_env_var("REDIS_URL", required=False)
 
     # API Keys
     print("\nAPI Keys:")
-    all_valid &= check_env_var("ANTHROPIC_API_KEY", required=False)
-    all_valid &= check_env_var("BRAVE_SEARCH_API_KEY", required=False)
-    all_valid &= check_env_var("SENDGRID_API_KEY", required=False)
+    all_valid = all_valid and check_env_var("ANTHROPIC_API_KEY", required=False)
+    all_valid = all_valid and check_env_var("BRAVE_SEARCH_API_KEY", required=False)
+    all_valid = all_valid and check_env_var("SENDGRID_API_KEY", required=False)
 
     # Paddle
     print("\nPaddle (Payment Processing):")
-    all_valid &= check_env_var("PADDLE_VENDOR_ID", required=False)
-    all_valid &= check_env_var("PADDLE_API_KEY", required=False)
-    all_valid &= check_env_var("PADDLE_PUBLIC_KEY", required=False)
-    all_valid &= check_env_var("PADDLE_WEBHOOK_SECRET", required=False)
+    all_valid = all_valid and check_env_var("PADDLE_VENDOR_ID", required=False)
+    all_valid = all_valid and check_env_var("PADDLE_API_KEY", required=False)
+    all_valid = all_valid and check_env_var("PADDLE_PUBLIC_KEY", required=False)
+    all_valid = all_valid and check_env_var("PADDLE_WEBHOOK_SECRET", required=False)
 
     # Google OAuth
     print("\nGoogle OAuth:")
-    all_valid &= check_env_var("GOOGLE_CLIENT_ID", required=False)
-    all_valid &= check_env_var("GOOGLE_CLIENT_SECRET", required=False)
+    all_valid = all_valid and check_env_var("GOOGLE_CLIENT_ID", required=False)
+    all_valid = all_valid and check_env_var("GOOGLE_CLIENT_SECRET", required=False)
 
     # CORS
     print("\nSecurity:")
-    all_valid &= check_env_var("CORS_ORIGINS", required=False)
+    all_valid = all_valid and check_env_var("CORS_ORIGINS", required=False)
 
     print("\n" + "=" * 60)
 

@@ -6,7 +6,13 @@ from app import create_app
 @pytest.fixture
 def client():
     """Create a test client for the app."""
-    app = create_app({"TESTING": True})
+    app = create_app(
+        {
+            "TESTING": True,
+            "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
+            "SECRET_KEY": "test-secret-key",
+        }
+    )
     with app.test_client() as client:
         yield client
 
@@ -14,7 +20,13 @@ def client():
 @pytest.fixture
 def app():
     """Create an app instance for testing."""
-    return create_app({"TESTING": True})
+    return create_app(
+        {
+            "TESTING": True,
+            "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
+            "SECRET_KEY": "test-secret-key",
+        }
+    )
 
 
 class TestHealthEndpoint:

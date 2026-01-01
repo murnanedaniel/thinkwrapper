@@ -8,7 +8,7 @@ class Config:
     """Base configuration."""
 
     # Flask
-    SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
+    SECRET_KEY = os.environ.get("SECRET_KEY")
     FLASK_ENV = os.environ.get("FLASK_ENV", "development")
 
     # Database
@@ -60,7 +60,10 @@ class DevelopmentConfig(Config):
 
     DEBUG = True
     TESTING = False
+    # Allow insecure cookies for local development over HTTP
     SESSION_COOKIE_SECURE = False
+    # Use a dev-only secret key if not provided
+    SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key-CHANGE-IN-PRODUCTION")
 
 
 class TestingConfig(Config):

@@ -102,7 +102,8 @@ def verify_paddle_webhook(data, signature):
     """
     Verify Paddle webhook signature.
 
-    This is a stub. Will be implemented in: Issue #TBD - Paddle Integration
+    STUB IMPLEMENTATION - Always returns True without verification.
+    Will be implemented in: Issue #TBD - Paddle Integration
 
     Args:
         data (dict): The webhook data

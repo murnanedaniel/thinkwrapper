@@ -1,204 +1,96 @@
 import pytest
 import os
-from unittest.mock import patch, Mock, MagicMock
+from unittest.mock import patch, Mock
 from app import services
 
 
 class TestNewsletterGeneration:
-    """Test newsletter content generation using OpenAI."""
+    """Test newsletter content generation stub."""
 
-    @patch("app.services.openai.Completion.create")
-    def test_generate_newsletter_content_success(self, mock_openai):
-        """Test successful newsletter generation."""
-        # Mock OpenAI response
-        mock_response = Mock()
-        mock_response.choices = [Mock()]
-        mock_response.choices[0].text = (
-            "Subject: AI Weekly Update\n\nGreat content about AI..."
-        )
-        mock_openai.return_value = mock_response
-
+    def test_generate_newsletter_content_stub(self):
+        """Test that newsletter generation returns stub data."""
         result = services.generate_newsletter_content("Artificial Intelligence")
 
         assert result is not None
         assert "subject" in result
         assert "content" in result
-        assert result["subject"] == "Subject: AI Weekly Update"
-        assert "Great content about AI..." in result["content"]
+        assert "Artificial Intelligence" in result["subject"]
 
-        # Verify OpenAI was called with correct parameters
-        mock_openai.assert_called_once()
-        call_args = mock_openai.call_args
-        assert "prompt" in call_args[1]
-        assert "Artificial Intelligence" in call_args[1]["prompt"]
-        assert call_args[1]["model"] == "gpt-4"
-        assert call_args[1]["max_tokens"] == 1500
-        assert call_args[1]["temperature"] == 0.7
-
-    @patch("app.services.openai.Completion.create")
-    def test_generate_newsletter_content_with_style(self, mock_openai):
-        """Test newsletter generation with custom style."""
-        mock_response = Mock()
-        mock_response.choices = [Mock()]
-        mock_response.choices[0].text = "Subject: Tech Brief\n\nConcise AI update..."
-        mock_openai.return_value = mock_response
-
+    def test_generate_newsletter_content_with_style(self):
+        """Test newsletter generation with custom style parameter."""
         result = services.generate_newsletter_content("AI", style="brief")
 
         assert result is not None
         assert "subject" in result
         assert "content" in result
 
-        # Check that style was included in prompt
-        call_args = mock_openai.call_args
-        assert "brief" in call_args[1]["prompt"]
 
-    @patch("app.services.openai.Completion.create")
-    def test_generate_newsletter_content_openai_error(self, mock_openai):
-        """Test handling of OpenAI API errors."""
-        mock_openai.side_effect = Exception("OpenAI API Error")
+class TestBraveSearch:
+    """Test Brave Search API stub."""
 
-        result = services.generate_newsletter_content("Test Topic")
+    def test_search_brave_stub(self):
+        """Test that Brave search returns stub data."""
+        result = services.search_brave("artificial intelligence")
 
-        assert result is None
+        assert result is not None
+        assert isinstance(result, list)
 
-    @patch("app.services.openai.Completion.create")
-    @patch("app.services.current_app")
-    def test_generate_newsletter_content_logs_error(self, mock_app, mock_openai):
-        """Test that errors are properly logged."""
-        mock_openai.side_effect = Exception("API Rate Limit")
-        mock_logger = Mock()
-        mock_app.logger = mock_logger
+    def test_search_brave_with_num_results(self):
+        """Test Brave search with custom num_results parameter."""
+        result = services.search_brave("AI", num_results=5)
 
-        result = services.generate_newsletter_content("Test Topic")
+        assert result is not None
+        assert isinstance(result, list)
 
-        assert result is None
-        mock_logger.error.assert_called_once()
-        error_call = mock_logger.error.call_args[0][0]
-        assert "OpenAI generation error" in error_call
-        assert "API Rate Limit" in error_call
+
+class TestNewsletterSynthesis:
+    """Test newsletter synthesis stub."""
+
+    def test_synthesize_newsletter_stub(self):
+        """Test that newsletter synthesis returns stub data."""
+        result = services.synthesize_newsletter(
+            topic="AI Weekly",
+            search_results=[],
+            research_output="Research data",
+        )
+
+        assert result is not None
+        assert "subject" in result
+        assert "content" in result
+        assert "AI Weekly" in result["subject"]
 
 
 class TestEmailService:
-    """Test email sending functionality using SendGrid."""
+    """Test email sending stub."""
 
-    @patch("app.services.sendgrid.SendGridAPIClient")
+    def test_send_email_stub_no_api_key(self):
+        """Test email sending without API key returns False."""
+        with patch.dict(os.environ, {}, clear=True):
+            result = services.send_email(
+                "test@example.com", "Test Subject", "<h1>Test Content</h1>"
+            )
+            assert result is False
+
     @patch.dict(os.environ, {"SENDGRID_API_KEY": "test-api-key"})
-    def test_send_email_success(self, mock_sendgrid_client):
-        """Test successful email sending."""
-        # Mock SendGrid client
-        mock_client = Mock()
-        mock_response = Mock()
-        mock_response.status_code = 202
-        mock_client.client.mail.send.post.return_value = mock_response
-        mock_sendgrid_client.return_value = mock_client
-
-        result = services.send_email(
-            "test@example.com", "Test Subject", "<h1>Test Content</h1>"
-        )
-
+    def test_send_email_stub_with_api_key(self):
+        """Test email sending stub with API key returns True."""
+        result = services.send_email("test@example.com", "Test Subject", "Test Content")
+        # Stub implementation returns True when API key is set
         assert result is True
-        mock_sendgrid_client.assert_called_once_with(api_key="test-api-key")
-        mock_client.client.mail.send.post.assert_called_once()
-
-    @patch("app.services.sendgrid.SendGridAPIClient")
-    @patch.dict(os.environ, {"SENDGRID_API_KEY": "test-api-key"})
-    def test_send_email_success_with_200_status(self, mock_sendgrid_client):
-        """Test successful email sending with 200 status code."""
-        mock_client = Mock()
-        mock_response = Mock()
-        mock_response.status_code = 200  # Alternative success status
-        mock_client.client.mail.send.post.return_value = mock_response
-        mock_sendgrid_client.return_value = mock_client
-
-        result = services.send_email("test@example.com", "Test Subject", "Test Content")
-
-        assert result is True
-
-    @patch("app.services.sendgrid.SendGridAPIClient")
-    @patch.dict(os.environ, {"SENDGRID_API_KEY": "test-api-key"})
-    def test_send_email_failure_status(self, mock_sendgrid_client):
-        """Test email sending with failure status code."""
-        mock_client = Mock()
-        mock_response = Mock()
-        mock_response.status_code = 400  # Error status
-        mock_client.client.mail.send.post.return_value = mock_response
-        mock_sendgrid_client.return_value = mock_client
-
-        result = services.send_email("test@example.com", "Test Subject", "Test Content")
-
-        assert result is False
-
-    @patch.dict(os.environ, {}, clear=True)
-    @patch("app.services.current_app")
-    def test_send_email_no_api_key(self, mock_app):
-        """Test email sending without API key configured."""
-        mock_logger = Mock()
-        mock_app.logger = mock_logger
-
-        result = services.send_email("test@example.com", "Test Subject", "Test Content")
-
-        assert result is False
-        mock_logger.error.assert_called_once()
-        error_call = mock_logger.error.call_args[0][0]
-        assert "SendGrid API key not configured" in error_call
-
-    @patch("app.services.sendgrid.SendGridAPIClient")
-    @patch.dict(os.environ, {"SENDGRID_API_KEY": "test-api-key"})
-    @patch("app.services.current_app")
-    def test_send_email_sendgrid_exception(self, mock_app, mock_sendgrid_client):
-        """Test handling of SendGrid exceptions."""
-        mock_sendgrid_client.side_effect = Exception("SendGrid connection error")
-        mock_logger = Mock()
-        mock_app.logger = mock_logger
-
-        result = services.send_email("test@example.com", "Test Subject", "Test Content")
-
-        assert result is False
-        mock_logger.error.assert_called_once()
-        error_call = mock_logger.error.call_args[0][0]
-        assert "Email sending error" in error_call
-        assert "SendGrid connection error" in error_call
-
-    @patch("app.services.sendgrid.SendGridAPIClient")
-    @patch.dict(os.environ, {"SENDGRID_API_KEY": "test-api-key"})
-    def test_send_email_mail_construction(self, mock_sendgrid_client):
-        """Test that email components are properly constructed."""
-        mock_client = Mock()
-        mock_response = Mock()
-        mock_response.status_code = 202
-        mock_client.client.mail.send.post.return_value = mock_response
-        mock_sendgrid_client.return_value = mock_client
-
-        # Test with HTML content
-        result = services.send_email(
-            "recipient@example.com",
-            "Newsletter Subject",
-            "<html><body><h1>HTML Content</h1></body></html>",
-        )
-
-        assert result is True
-
-        # Verify the mail was sent with proper request body
-        mock_client.client.mail.send.post.assert_called_once()
-        call_args = mock_client.client.mail.send.post.call_args
-        assert "request_body" in call_args[1]
 
 
 class TestWebhookVerification:
-    """Test Paddle webhook signature verification."""
+    """Test Paddle webhook signature verification stub."""
 
-    def test_verify_paddle_webhook_placeholder(self):
-        """Test that webhook verification currently returns True (placeholder)."""
-        # Current implementation always returns True
+    def test_verify_paddle_webhook_stub(self):
+        """Test that webhook verification stub returns True."""
         result = services.verify_paddle_webhook(
             {"event": "subscription_created"}, "test-signature"
         )
-
         assert result is True
 
     def test_verify_paddle_webhook_with_different_data(self):
-        """Test webhook verification with various data types."""
+        """Test webhook verification stub with various data types."""
         test_cases = [
             ({"user_id": 123}, "sig123"),
             ({}, "empty_sig"),
@@ -208,74 +100,5 @@ class TestWebhookVerification:
 
         for data, signature in test_cases:
             result = services.verify_paddle_webhook(data, signature)
-            # All should return True with current placeholder implementation
+            # Stub implementation always returns True
             assert result is True
-
-
-class TestServiceConfiguration:
-    """Test service configuration and environment setup."""
-
-    @patch.dict(os.environ, {"OPENAI_API_KEY": "test-openai-key"})
-    def test_openai_api_key_configuration(self):
-        """Test that OpenAI API key is properly configured."""
-        # Import services again to trigger API key setup
-        import importlib
-
-        importlib.reload(services)
-
-        # The openai.api_key should be set from environment
-        assert services.openai.api_key == "test-openai-key"
-
-    @patch.dict(os.environ, {}, clear=True)
-    def test_openai_api_key_missing(self):
-        """Test behavior when OpenAI API key is missing."""
-        import importlib
-
-        importlib.reload(services)
-
-        # Should be None when not set
-        assert services.openai.api_key is None
-
-
-class TestContentProcessing:
-    """Test content processing and text manipulation."""
-
-    @patch("app.services.openai.Completion.create")
-    def test_generate_newsletter_content_text_processing(self, mock_openai):
-        """Test that content is properly processed and split."""
-        # Mock response with multi-line content
-        mock_response = Mock()
-        mock_response.choices = [Mock()]
-        mock_response.choices[
-            0
-        ].text = """Subject: Weekly AI Update
-
-        This is the first paragraph of content.
-        
-        This is the second paragraph with more details.
-        
-        Conclusion paragraph here."""
-        mock_openai.return_value = mock_response
-
-        result = services.generate_newsletter_content("AI Weekly")
-
-        assert result is not None
-        assert result["subject"] == "Subject: Weekly AI Update"
-        assert "This is the first paragraph" in result["content"]
-        assert "Conclusion paragraph here" in result["content"]
-        # Subject should not be in content
-        assert "Subject: Weekly AI Update" not in result["content"]
-
-    @patch("app.services.openai.Completion.create")
-    def test_generate_newsletter_single_line_content(self, mock_openai):
-        """Test handling of single-line responses."""
-        mock_response = Mock()
-        mock_response.choices = [Mock()]
-        mock_response.choices[0].text = "Single line content without subject"
-        mock_openai.return_value = mock_response
-
-        result = services.generate_newsletter_content("Test")
-
-        assert result is not None
-        assert result["subject"] == "Single line content without subject"
-        assert result["content"] == ""

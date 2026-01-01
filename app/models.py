@@ -18,6 +18,10 @@ class User(UserMixin, db.Model):
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+    # Cascade behavior: Deleting a user will delete all their newsletters.
+    # Since Newsletter also cascades to Issue records, this creates a nested
+    # cascade where deleting a user will delete all their newsletters AND all
+    # issues associated with those newsletters.
     newsletters = db.relationship(
         "Newsletter", back_populates="user", cascade="all, delete-orphan"
     )

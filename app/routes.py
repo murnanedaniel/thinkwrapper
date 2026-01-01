@@ -2,7 +2,6 @@ from flask import (
     Blueprint,
     jsonify,
     request,
-    render_template,
     current_app,
     send_from_directory,
 )
@@ -38,5 +37,5 @@ def catch_all(path):
     """Serve static files or return index.html for client-side routing."""
     try:
         return send_from_directory(current_app.static_folder, path)
-    except:
+    except Exception:
         return send_from_directory(current_app.static_folder, "index.html")

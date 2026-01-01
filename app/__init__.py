@@ -18,9 +18,13 @@ def create_app(test_config=None):
     # Load configuration
     if test_config is None:
         env = os.environ.get("FLASK_ENV", "development")
-        from .config import config
+        from .config import config, ProductionConfig
 
         app.config.from_object(config[env])
+
+        # Validate required configuration in production
+        if env == "production":
+            ProductionConfig.validate_config()
     else:
         # Load the test config if passed in
         app.config.from_mapping(test_config)
@@ -34,6 +38,12 @@ def create_app(test_config=None):
 
     # Import models to register with SQLAlchemy
     from . import models
+
+    # Configure Flask-Login user loader
+    @login_manager.user_loader
+    def load_user(user_id):
+        """Load user by ID for Flask-Login."""
+        return models.User.query.get(int(user_id))
 
     # Register blueprints
     from . import routes

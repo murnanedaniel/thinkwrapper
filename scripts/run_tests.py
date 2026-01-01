@@ -33,7 +33,7 @@ def check_dependencies():
     print("\n🔍 Checking dependencies...")
 
     missing_deps = []
-    required_packages = ["flask", "pytest", "openai", "sendgrid"]
+    required_packages = ["flask", "pytest", "anthropic", "sendgrid"]
 
     for package in required_packages:
         try:
@@ -55,7 +55,7 @@ def install_missing_dependencies(missing_deps):
 
     # Create requirements mapping
     package_mapping = {
-        "openai": "openai==1.3.5",
+        "anthropic": "anthropic>=0.18.0",
         "sendgrid": "sendgrid==6.10.0",
         "flask": "flask==3.0.0",
         "pytest": "pytest==7.4.3",
@@ -159,10 +159,9 @@ def generate_test_report():
     if not results["services"]:
         print(f"\n{'⚠️  KNOWN ISSUES':-^80}")
         print(
-            "🔴 CRITICAL: OpenAI API deprecated - services using old openai.Completion API"
+            "🔴 Service tests may fail - services are stubbed pending feature implementation"
         )
-        print("🔴 CRITICAL: Flask context issues in service layer")
-        print("🔧 These issues need to be fixed by updating to OpenAI v1.0+ API")
+        print("🔧 See GitHub issues for Anthropic/Brave/SendGrid integration plans")
 
     return results["routes"]  # Return True if core functionality works
 
