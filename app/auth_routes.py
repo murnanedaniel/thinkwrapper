@@ -1,7 +1,7 @@
 """Authentication routes for OAuth login/logout."""
-from flask import Blueprint, redirect, url_for, session, jsonify, request
+from flask import Blueprint, redirect, url_for, session, jsonify, request, current_app
 from flask_login import login_user, logout_user, login_required, current_user
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, scoped_session, sessionmaker
 from sqlalchemy import create_engine
 import os
 
@@ -10,23 +10,19 @@ from .models import User, Base
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 
-# Database setup (will be initialized in create_app)
-engine = None
-db_session = None
-
-def init_db(app):
-    """Initialize database connection."""
-    global engine, db_session
-    database_url = os.getenv('DATABASE_URL', 'sqlite:///thinkwrapper.db')
-    # Fix for Heroku postgres URL
-    if database_url.startswith('postgres://'):
-        database_url = database_url.replace('postgres://', 'postgresql://', 1)
+def get_db_session():
+    """Get database session from app context."""
+    if not hasattr(current_app, 'db_session_factory'):
+        database_url = os.getenv('DATABASE_URL', 'sqlite:///thinkwrapper.db')
+        # Fix for Heroku postgres URL
+        if database_url.startswith('postgres://'):
+            database_url = database_url.replace('postgres://', 'postgresql://', 1)
+        
+        engine = create_engine(database_url)
+        Base.metadata.create_all(engine)
+        current_app.db_session_factory = scoped_session(sessionmaker(bind=engine))
     
-    engine = create_engine(database_url)
-    Base.metadata.create_all(engine)
-    from sqlalchemy.orm import sessionmaker
-    SessionLocal = sessionmaker(bind=engine)
-    db_session = SessionLocal
+    return current_app.db_session_factory()
 
 @auth_bp.route('/login')
 def login():
@@ -45,9 +41,9 @@ def callback():
             return jsonify({'error': 'Failed to get user info'}), 400
         
         # Get or create user
-        session_db = db_session()
+        db = get_db_session()
         try:
-            user = session_db.query(User).filter_by(
+            user = db.query(User).filter_by(
                 oauth_provider='google',
                 oauth_id=user_info['sub']
             ).first()
@@ -60,21 +56,16 @@ def callback():
                     oauth_provider='google',
                     oauth_id=user_info['sub']
                 )
-                session_db.add(user)
-                session_db.commit()
+                db.add(user)
+                db.commit()
             
             # Log in the user
             login_user(user)
-            session['user_info'] = {
-                'email': user.email,
-                'name': user.name,
-                'id': user.id
-            }
             
             # Redirect to frontend
             return redirect('/')
         finally:
-            session_db.close()
+            db.close()
             
     except Exception as e:
         return jsonify({'error': str(e)}), 500

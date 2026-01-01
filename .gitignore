@@ -55,5 +55,10 @@ yarn-error.log*
 client/dist/
 client/build/
 
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
 # Logs
 *.log

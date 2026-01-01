@@ -1,13 +1,24 @@
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+
+// Route constants
+const ROUTES = {
+  HOME: '/',
+  LOGIN: '/login',
+  DASHBOARD: '/dashboard',
+  CREATE: '/create',
+  LOGOUT_API: '/api/auth/logout'
+}
 
 function Header({ isLoggedIn, setIsLoggedIn, user, setUser }) {
+  const navigate = useNavigate()
+
   const handleLogout = () => {
     // Call the backend logout endpoint
-    fetch('/api/auth/logout')
+    fetch(ROUTES.LOGOUT_API)
       .then(() => {
         setIsLoggedIn(false)
         setUser(null)
-        window.location.href = '/'
+        navigate(ROUTES.HOME)
       })
       .catch(err => console.error('Logout error:', err))
   }
@@ -15,7 +26,7 @@ function Header({ isLoggedIn, setIsLoggedIn, user, setUser }) {
   return (
     <header className="header">
       <div className="container header-container">
-        <Link to="/" className="logo">
+        <Link to={ROUTES.HOME} className="logo">
           ThinkWrapper
         </Link>
         <nav>
@@ -23,10 +34,10 @@ function Header({ isLoggedIn, setIsLoggedIn, user, setUser }) {
             {isLoggedIn ? (
               <>
                 <li>
-                  <Link to="/dashboard">Dashboard</Link>
+                  <Link to={ROUTES.DASHBOARD}>Dashboard</Link>
                 </li>
                 <li>
-                  <Link to="/create">Create New</Link>
+                  <Link to={ROUTES.CREATE}>Create New</Link>
                 </li>
                 <li>
                   <span className="user-name">{user?.name || user?.email}</span>
@@ -40,10 +51,10 @@ function Header({ isLoggedIn, setIsLoggedIn, user, setUser }) {
             ) : (
               <>
                 <li>
-                  <Link to="/login">Login</Link>
+                  <Link to={ROUTES.LOGIN}>Login</Link>
                 </li>
                 <li>
-                  <Link to="/login" className="btn btn-primary">
+                  <Link to={ROUTES.LOGIN} className="btn btn-primary">
                     Sign Up
                   </Link>
                 </li>

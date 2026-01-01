@@ -24,19 +24,13 @@ def create_app(test_config=None):
     # User loader for Flask-Login
     @login_manager.user_loader
     def load_user(user_id):
-        from .auth_routes import db_session
+        from .auth_routes import get_db_session
         from .models import User
-        if db_session:
-            session = db_session()
-            try:
-                return session.query(User).get(int(user_id))
-            finally:
-                session.close()
-        return None
-    
-    # Initialize database
-    from .auth_routes import init_db
-    init_db(app)
+        db = get_db_session()
+        try:
+            return db.query(User).get(int(user_id))
+        finally:
+            db.close()
     
     # Register blueprints
     from . import routes

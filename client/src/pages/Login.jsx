@@ -1,6 +1,12 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 
+// Route constants
+const ROUTES = {
+  DASHBOARD: '/dashboard',
+  LOGIN_API: '/api/auth/login'
+}
+
 function Login() {
   const navigate = useNavigate()
 
@@ -10,7 +16,7 @@ function Login() {
       .then(res => res.json())
       .then(data => {
         if (data.authenticated) {
-          navigate('/dashboard')
+          navigate(ROUTES.DASHBOARD)
         }
       })
       .catch(err => console.error('Error checking auth:', err))
@@ -18,7 +24,7 @@ function Login() {
 
   const handleGoogleLogin = () => {
     // Redirect to backend OAuth endpoint
-    window.location.href = '/api/auth/login'
+    window.location.href = ROUTES.LOGIN_API
   }
 
   return (

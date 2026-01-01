@@ -42,20 +42,20 @@ def test_callback_success(client, mock_oauth):
     }
     mock_oauth.google.authorize_access_token.return_value = mock_token
     
-    with patch('app.auth_routes.db_session') as mock_db_session:
-        mock_session = MagicMock()
-        mock_db_session.return_value = mock_session
+    with patch('app.auth_routes.get_db_session') as mock_get_db:
+        mock_db = MagicMock()
+        mock_get_db.return_value = mock_db
         
         # Mock query to return no existing user
-        mock_query = mock_session.query.return_value
+        mock_query = mock_db.query.return_value
         mock_query.filter_by.return_value.first.return_value = None
         
         with patch('app.auth_routes.login_user') as mock_login:
             response = client.get('/api/auth/callback')
             
             # Should create new user and log in
-            assert mock_session.add.called
-            assert mock_session.commit.called
+            assert mock_db.add.called
+            assert mock_db.commit.called
             assert mock_login.called
 
 def test_callback_existing_user(client, mock_oauth):
@@ -69,9 +69,9 @@ def test_callback_existing_user(client, mock_oauth):
     }
     mock_oauth.google.authorize_access_token.return_value = mock_token
     
-    with patch('app.auth_routes.db_session') as mock_db_session:
-        mock_session = MagicMock()
-        mock_db_session.return_value = mock_session
+    with patch('app.auth_routes.get_db_session') as mock_get_db:
+        mock_db = MagicMock()
+        mock_get_db.return_value = mock_db
         
         # Mock existing user
         existing_user = User(
@@ -81,14 +81,14 @@ def test_callback_existing_user(client, mock_oauth):
             oauth_provider='google',
             oauth_id='google-user-123'
         )
-        mock_query = mock_session.query.return_value
+        mock_query = mock_db.query.return_value
         mock_query.filter_by.return_value.first.return_value = existing_user
         
         with patch('app.auth_routes.login_user') as mock_login:
             response = client.get('/api/auth/callback')
             
             # Should not add new user, just log in
-            assert not mock_session.add.called
+            assert not mock_db.add.called
             assert mock_login.called
 
 def test_callback_failure(client, mock_oauth):
