@@ -49,9 +49,10 @@ class TestNewsletterSynthesisRoutes:
         assert response.status_code == 200
         data = response.json
         assert data['success'] is True
-        assert data['subject'] == 'Test Newsletter'
-        assert 'rendered' in data
-        assert 'html' in data['rendered']
+        assert 'data' in data
+        assert data['data']['subject'] == 'Test Newsletter'
+        assert 'rendered' in data['data']
+        assert 'html' in data['data']['rendered']
     
     def test_synthesize_newsletter_missing_newsletter_id(self, client):
         """Test synthesis without newsletter_id."""
@@ -107,8 +108,9 @@ class TestNewsletterSynthesisRoutes:
         
         assert response.status_code == 200
         data = response.json
-        assert 'html' in data['rendered']
-        assert 'text' in data['rendered']
+        assert 'data' in data
+        assert 'html' in data['data']['rendered']
+        assert 'text' in data['data']['rendered']
     
     @patch('app.routes.NewsletterSynthesizer')
     @patch('app.routes.NewsletterRenderer')
@@ -137,8 +139,9 @@ class TestNewsletterSynthesisRoutes:
         
         assert response.status_code == 200
         data = response.json
-        assert 'text' in data['rendered']
-        assert 'html' not in data['rendered']
+        assert 'data' in data
+        assert 'text' in data['data']['rendered']
+        assert 'html' not in data['data']['rendered']
     
     @patch('app.routes.NewsletterSynthesizer')
     def test_synthesize_newsletter_synthesis_failure(self, mock_synthesizer_class, client):

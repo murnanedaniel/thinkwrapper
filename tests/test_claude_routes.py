@@ -38,9 +38,10 @@ class TestClaudeGenerateEndpoint:
         assert response.status_code == 200
         data = response.json
         assert data['success'] is True
-        assert data['text'] == 'Generated text response'
-        assert data['model'] == 'claude-3-5-sonnet-20241022'
-        assert 'usage' in data
+        assert 'data' in data
+        assert data['data']['text'] == 'Generated text response'
+        assert data['data']['model'] == 'claude-3-5-sonnet-20241022'
+        assert 'usage' in data['data']
         mock_generate.assert_called_once()
     
     @patch('app.claude_service.generate_text')

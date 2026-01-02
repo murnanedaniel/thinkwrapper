@@ -33,7 +33,7 @@ class TestNewsletterGeneration:
         call_args = mock_client.chat.completions.create.call_args
         assert "messages" in call_args[1]
         assert call_args[1]["model"] == "gpt-4"
-        assert call_args[1]["max_tokens"] == 1500
+        assert call_args[1]["max_tokens"] == 1024
         assert call_args[1]["temperature"] == 0.7
 
     @patch("app.services.get_openai_client")

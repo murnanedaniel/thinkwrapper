@@ -27,7 +27,7 @@ def generate_newsletter():
     """Generate a newsletter based on the provided topic."""
     data = request.json
     topic = InputValidator.sanitize_string(data.get('topic', ''))
-    style = data.get('style', 'concise')
+    style = data.get('style', 'professional')
 
     # Validate topic
     is_valid, error_msg = InputValidator.validate_topic(topic)
