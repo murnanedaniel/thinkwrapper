@@ -1,15 +1,32 @@
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 
-function Header({ isLoggedIn, setIsLoggedIn }) {
+// Route constants
+const ROUTES = {
+  HOME: '/',
+  LOGIN: '/login',
+  DASHBOARD: '/dashboard',
+  CREATE: '/create',
+  LOGOUT_API: '/api/auth/logout'
+}
+
+function Header({ isLoggedIn, setIsLoggedIn, user, setUser }) {
+  const navigate = useNavigate()
+
   const handleLogout = () => {
-    // In a real app, we would call an API endpoint to logout
-    setIsLoggedIn(false)
+    // Call the backend logout endpoint
+    fetch(ROUTES.LOGOUT_API)
+      .then(() => {
+        setIsLoggedIn(false)
+        setUser(null)
+        navigate(ROUTES.HOME)
+      })
+      .catch(err => console.error('Logout error:', err))
   }
 
   return (
     <header className="header">
       <div className="container header-container">
-        <Link to="/" className="logo">
+        <Link to={ROUTES.HOME} className="logo">
           ThinkWrapper
         </Link>
         <nav>
@@ -17,10 +34,13 @@ function Header({ isLoggedIn, setIsLoggedIn }) {
             {isLoggedIn ? (
               <>
                 <li>
-                  <Link to="/dashboard">Dashboard</Link>
+                  <Link to={ROUTES.DASHBOARD}>Dashboard</Link>
                 </li>
                 <li>
-                  <Link to="/create">Create New</Link>
+                  <Link to={ROUTES.CREATE}>Create New</Link>
+                </li>
+                <li>
+                  <span className="user-name">{user?.name || user?.email}</span>
                 </li>
                 <li>
                   <button onClick={handleLogout} className="btn-link">
@@ -31,10 +51,10 @@ function Header({ isLoggedIn, setIsLoggedIn }) {
             ) : (
               <>
                 <li>
-                  <Link to="/login">Login</Link>
+                  <Link to={ROUTES.LOGIN}>Login</Link>
                 </li>
                 <li>
-                  <Link to="/signup" className="btn btn-primary">
+                  <Link to={ROUTES.LOGIN} className="btn btn-primary">
                     Sign Up
                   </Link>
                 </li>

@@ -4,15 +4,38 @@ An AI-powered newsletter generation service that allows users to create and sche
 
 ## Features
 
-- Generate AI-written newsletters using OpenAI
-- Schedule regular newsletter delivery
-- Modern React frontend
-- Flask API backend
-- Subscription management with Paddle
+- **Generate AI-written newsletters** using OpenAI and Anthropic Claude
+- **Newsletter Synthesis Service** - Collect, transform and synthesize content into newsletters
+- **Multiple Rendering Formats** - Plain text and HTML output
+- **Web search integration with Brave Search API**
+- **Schedule regular newsletter delivery**
+- **On-demand admin controls** for newsletter generation
+- **Modern React frontend**
+- **Flask API backend**
+- **Subscription management** with Paddle
+- **Google OAuth authentication for secure login**
+- **Background task processing** with Celery and Redis
+
+## New: Newsletter Synthesis Service
+
+The Newsletter Synthesis Service provides powerful backend capabilities for automated newsletter generation:
+
+- Collect and transform source content into newsletter summaries
+- AI-powered content synthesis with OpenAI integration
+- Pluggable rendering system (plain text, HTML)
+- Admin API endpoints for on-demand generation
+- Configurable settings for schedule and delivery format
+- Email distribution via SendGrid
+
+📚 **See [NEWSLETTER_SERVICE_DOCS.md](NEWSLETTER_SERVICE_DOCS.md) for complete documentation**
+
+🚀 **Try the demo**: `python demo_newsletter_service.py`
 
 ## Tech Stack
 
 - **Backend**: Flask 3 + Gunicorn
+- **AI Services**: OpenAI, Anthropic Claude
+- **Task Queue**: Celery with Redis
 - **Database**: PostgreSQL
 - **Frontend**: React 18 (Vite) SPA
 - **Email**: SendGrid
@@ -26,6 +49,7 @@ An AI-powered newsletter generation service that allows users to create and sche
 - Python 3.12+
 - Node.js 18+
 - PostgreSQL (local or remote instance)
+- Redis (for Celery task queue)
 
 ### Backend Setup
 
@@ -45,16 +69,67 @@ An AI-powered newsletter generation service that allows users to create and sche
 3. Set up environment variables (create a `.env` file in project root):
    ```
    FLASK_ENV=development
-   OPENAI_API_KEY=your-api-key
+   SECRET_KEY=your-secret-key-for-sessions
+   OPENAI_API_KEY=your-openai-api-key
+   ANTHROPIC_API_KEY=your-anthropic-api-key
+   BRAVE_SEARCH_API_KEY=your-brave-api-key
    DATABASE_URL=postgresql://username:password@localhost:5432/thinkwrapper
    SENDGRID_API_KEY=your-sendgrid-key
    PADDLE_VENDOR_ID=your-paddle-id
    PADDLE_API_KEY=your-paddle-key
+   PADDLE_WEBHOOK_SECRET=your-webhook-secret
+   PADDLE_SANDBOX=true
+   GOOGLE_CLIENT_ID=your-google-oauth-client-id
+   GOOGLE_CLIENT_SECRET=your-google-oauth-client-secret
+   REDIS_URL=redis://localhost:6379/0
    ```
 
-4. Run the Flask development server:
+   For detailed Paddle setup instructions, see [docs/PADDLE_INTEGRATION.md](docs/PADDLE_INTEGRATION.md)
+
+   **Getting API Keys:**
+   - **Anthropic Claude API**: Sign up at [console.anthropic.com](https://console.anthropic.com) to get your API key
+   - **OpenAI API**: Get your API key from [platform.openai.com](https://platform.openai.com)
+   - Store API keys securely and never commit them to source control
+
+### Google OAuth Setup
+
+To enable Google OAuth authentication:
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select an existing one
+3. Enable the Google+ API
+4. Go to "Credentials" and create OAuth 2.0 credentials
+5. Add authorized redirect URIs:
+   - Development: `http://localhost:5000/api/auth/callback`
+   - Production: `https://your-domain.com/api/auth/callback`
+6. Copy the Client ID and Client Secret to your `.env` file
+
+**Note:** For production, ensure you have a secure `SECRET_KEY` for session management.
+
+4. Install and start Redis (required for Celery):
+   ```bash
+   # macOS
+   brew install redis
+   brew services start redis
+
+   # Ubuntu/Debian
+   sudo apt-get install redis-server
+   sudo systemctl start redis
+   ```
+
+5. Run the Flask development server:
    ```bash
    flask --app app run --debug
+   ```
+
+6. Start Celery worker (in a separate terminal):
+   ```bash
+   python celery_worker.py worker --loglevel=info
+   ```
+
+7. (Optional) Start Celery beat for periodic tasks (in another terminal):
+   ```bash
+   python celery_worker.py beat --loglevel=info
    ```
 
 ### Frontend Setup
@@ -72,6 +147,36 @@ An AI-powered newsletter generation service that allows users to create and sche
 
 3. Access the frontend at http://localhost:5173
 
+## Testing
+
+ThinkWrapper has a comprehensive test suite with **36 tests** and **66% code coverage**.
+
+### Quick Start
+
+```bash
+# Run all tests
+pytest
+
+# Run tests with verbose output
+pytest -v
+
+# Run specific test file
+pytest tests/test_routes.py
+
+# Generate HTML coverage report
+pytest --cov-report=html
+open htmlcov/index.html
+```
+
+### Test Structure
+
+- **36 total tests** (100% passing)
+- **3 test files**: routes (basic), routes (comprehensive), services
+- **Routes coverage**: 100%
+- **Services coverage**: 95%
+
+For detailed testing documentation, see [TESTING.md](TESTING.md).
+
 ## Deployment
 
 The app is configured for Heroku deployment:
@@ -85,12 +190,21 @@ The app is configured for Heroku deployment:
    ```bash
    heroku addons:create heroku-postgresql:mini
    heroku addons:create sendgrid:starter
+   heroku addons:create heroku-redis:mini
    ```
 
 3. Set environment variables:
    ```bash
    heroku config:set FLASK_ENV=production
-   heroku config:set OPENAI_API_KEY=your-api-key
+   heroku config:set SECRET_KEY=your-production-secret-key
+   heroku config:set OPENAI_API_KEY=your-openai-api-key
+   heroku config:set ANTHROPIC_API_KEY=your-anthropic-api-key
+   heroku config:set BRAVE_SEARCH_API_KEY=your-brave-api-key
+   heroku config:set GOOGLE_CLIENT_ID=your-google-client-id
+   heroku config:set GOOGLE_CLIENT_SECRET=your-google-client-secret
+   heroku config:set PADDLE_VENDOR_ID=your-paddle-vendor-id
+   heroku config:set PADDLE_API_KEY=your-paddle-api-key
+   heroku config:set PADDLE_WEBHOOK_SECRET=your-paddle-webhook-secret
    # etc.
    ```
 
@@ -99,6 +213,49 @@ The app is configured for Heroku deployment:
    git push heroku main
    ```
 
+5. Scale worker dynos:
+   ```bash
+   heroku ps:scale web=1 worker=1 beat=1
+   ```
+
+## Background Tasks
+
+ThinkWrapper uses Celery for background task processing. See [CELERY.md](CELERY.md) for detailed documentation on:
+
+- Setting up and running Celery workers
+- Available tasks (newsletter generation, email sending, etc.)
+- Monitoring and troubleshooting
+- Production deployment guidelines
+
+## Troubleshooting
+
+### Google OAuth Issues
+
+**Problem:** "redirect_uri_mismatch" error
+- **Solution:** Ensure the redirect URI in your Google Cloud Console matches exactly with your application URL. For local development, use `http://localhost:5000/api/auth/callback`.
+
+**Problem:** Users can't log in after deployment
+- **Solution:**
+  1. Verify `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set in production environment
+  2. Ensure your production URL is added as an authorized redirect URI in Google Cloud Console
+  3. Check that `SECRET_KEY` is set for session management
+
+**Problem:** "Invalid client" error
+- **Solution:** Double-check that your Google OAuth credentials are correctly copied to your environment variables without any extra spaces or characters.
+
+**Problem:** Session not persisting after login
+- **Solution:** Ensure `SECRET_KEY` is set in your environment variables. In production, this should be a strong, random string.
+
+### Database Issues
+
+**Problem:** User table doesn't have oauth_provider column
+- **Solution:** Run database migrations or manually add the columns:
+  ```sql
+  ALTER TABLE users ADD COLUMN name VARCHAR(255);
+  ALTER TABLE users ADD COLUMN oauth_provider VARCHAR(50);
+  ALTER TABLE users ADD COLUMN oauth_id VARCHAR(255);
+  ```
+
 ## License
 
-MIT 
+MIT
