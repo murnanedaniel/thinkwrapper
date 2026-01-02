@@ -16,20 +16,23 @@ An AI-powered newsletter generation service that allows users to create and sche
 - **Google OAuth authentication for secure login**
 - **Background task processing** with Celery and Redis
 
-## New: Newsletter Synthesis Service
+## Documentation
 
-The Newsletter Synthesis Service provides powerful backend capabilities for automated newsletter generation:
+| Document | Description |
+|----------|-------------|
+| [User Journeys](docs/USER_JOURNEYS.md) | Complete user flow documentation |
+| [Newsletter Service](docs/guides/NEWSLETTER_SERVICE_DOCS.md) | Service architecture & API reference |
+| [Testing Guide](docs/guides/TESTING.md) | Test suite documentation |
+| [Implementation Summary](docs/guides/IMPLEMENTATION_SUMMARY.md) | Architecture overview |
 
-- Collect and transform source content into newsletter summaries
-- AI-powered content synthesis with OpenAI integration
-- Pluggable rendering system (plain text, HTML)
-- Admin API endpoints for on-demand generation
-- Configurable settings for schedule and delivery format
-- Email distribution via SendGrid
+### Integration Guides
 
-📚 **See [NEWSLETTER_SERVICE_DOCS.md](NEWSLETTER_SERVICE_DOCS.md) for complete documentation**
-
-🚀 **Try the demo**: `python demo_newsletter_service.py`
+| Integration | Guide |
+|-------------|-------|
+| Brave Search | [docs/integrations/BRAVE_SEARCH_INTEGRATION.md](docs/integrations/BRAVE_SEARCH_INTEGRATION.md) |
+| Celery Tasks | [docs/integrations/CELERY.md](docs/integrations/CELERY.md) |
+| Google OAuth | [docs/integrations/GOOGLE_OAUTH_SETUP.md](docs/integrations/GOOGLE_OAUTH_SETUP.md) |
+| Paddle Payments | [docs/integrations/PADDLE_INTEGRATION.md](docs/integrations/PADDLE_INTEGRATION.md) |
 
 ## Tech Stack
 
@@ -84,7 +87,7 @@ The Newsletter Synthesis Service provides powerful backend capabilities for auto
    REDIS_URL=redis://localhost:6379/0
    ```
 
-   For detailed Paddle setup instructions, see [docs/PADDLE_INTEGRATION.md](docs/PADDLE_INTEGRATION.md)
+   For detailed Paddle setup instructions, see [docs/integrations/PADDLE_INTEGRATION.md](docs/integrations/PADDLE_INTEGRATION.md)
 
    **Getting API Keys:**
    - **Anthropic Claude API**: Sign up at [console.anthropic.com](https://console.anthropic.com) to get your API key
@@ -149,7 +152,7 @@ To enable Google OAuth authentication:
 
 ## Testing
 
-ThinkWrapper has a comprehensive test suite with **36 tests** and **66% code coverage**.
+ThinkWrapper has a comprehensive test suite covering all major functionality.
 
 ### Quick Start
 
@@ -157,25 +160,29 @@ ThinkWrapper has a comprehensive test suite with **36 tests** and **66% code cov
 # Run all tests
 pytest
 
-# Run tests with verbose output
+# Run with verbose output
 pytest -v
 
-# Run specific test file
-pytest tests/test_routes.py
+# Run journey tests only
+pytest tests/test_journeys.py -v
 
-# Generate HTML coverage report
-pytest --cov-report=html
-open htmlcov/index.html
+# Generate coverage report
+pytest --cov=app --cov-report=html
 ```
 
 ### Test Structure
 
-- **36 total tests** (100% passing)
-- **3 test files**: routes (basic), routes (comprehensive), services
-- **Routes coverage**: 100%
-- **Services coverage**: 95%
+```
+tests/
+├── test_journeys.py      # End-to-end user journey tests (36 tests)
+├── test_routes.py        # Basic route tests
+├── test_services.py      # Service layer tests
+├── test_auth.py          # Authentication tests
+├── test_payment.py       # Payment integration tests
+└── ...                   # Additional test files
+```
 
-For detailed testing documentation, see [TESTING.md](TESTING.md).
+For detailed testing documentation, see [docs/guides/TESTING.md](docs/guides/TESTING.md).
 
 ## Deployment
 
@@ -220,7 +227,7 @@ The app is configured for Heroku deployment:
 
 ## Background Tasks
 
-ThinkWrapper uses Celery for background task processing. See [CELERY.md](CELERY.md) for detailed documentation on:
+ThinkWrapper uses Celery for background task processing. See [docs/integrations/CELERY.md](docs/integrations/CELERY.md) for detailed documentation on:
 
 - Setting up and running Celery workers
 - Available tasks (newsletter generation, email sending, etc.)
