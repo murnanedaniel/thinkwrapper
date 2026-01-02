@@ -31,7 +31,7 @@ def test_generate_newsletter(mock_task, client):
         'style': 'concise'
     })
     assert response.status_code == 202
-    assert 'status' in response.json
+    assert response.json['success'] is True
     assert response.json['status'] == 'processing'
     assert response.json['task_id'] == 'test-task-id-123'
 
@@ -50,6 +50,7 @@ def test_generate_newsletter_default_style(mock_task, client):
         'topic': 'AI News'
     })
     assert response.status_code == 202
+    assert response.json['success'] is True
     assert response.json['task_id'] == 'test-task-id-456'
 
     # Verify task was called with default style
