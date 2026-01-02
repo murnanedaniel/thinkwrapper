@@ -122,226 +122,35 @@ To enable Google OAuth authentication:
 
 3. Access the frontend at http://localhost:5173
 
-## Brave Search API Integration
+## Testing
 
-ThinkWrapper integrates with the Brave Search API to provide web search results for newsletter content generation.
+ThinkWrapper has a comprehensive test suite with **36 tests** and **66% code coverage**.
 
-### Obtaining a Brave Search API Key
-
-1. Visit the [Brave Search API website](https://brave.com/search/api/)
-2. Sign up for a free or paid account (free tier includes up to 2,000 queries per month)
-3. Navigate to your dashboard and generate an API key
-4. Copy the API key for use in your environment configuration
-
-### Configuring Brave Search API
-
-Add your Brave Search API key to your `.env` file:
-
-```
-BRAVE_SEARCH_API_KEY=your-brave-api-key-here
-```
-
-Or set it as an environment variable in your deployment environment:
+### Quick Start
 
 ```bash
-export BRAVE_SEARCH_API_KEY=your-brave-api-key-here
-```
-
-### Using Brave Search in Your Application
-
-The Brave Search integration is available through the `search_brave()` function in `app/services.py`:
-
-```python
-from app.services import search_brave
-
-# Basic search
-results = search_brave("artificial intelligence", count=10)
-
-# Check if search was successful
-if results['success']:
-    for result in results['results']:
-        print(f"Title: {result['title']}")
-        print(f"URL: {result['url']}")
-        print(f"Description: {result['description']}")
-else:
-    print(f"Search failed: {results['error']}")
-```
-
-### Fallback Mechanism
-
-The Brave Search integration includes a built-in fallback mechanism:
-
-- **Missing API Key**: If no API key is configured, the system automatically falls back to mock search results
-- **API Errors**: If the Brave API returns an error (e.g., rate limit exceeded, server error), the system falls back to mock results
-- **Network Timeouts**: If the API request times out, the system falls back to mock results
-- **Disable Fallback**: You can disable the fallback by setting `fallback_to_mock=False`:
-
-```python
-# No fallback - will return error if API fails
-results = search_brave("query", fallback_to_mock=False)
-```
-
-### API Usage Monitoring
-
-All Brave Search API requests and responses are automatically logged for quota monitoring:
-
-- Request logs include: timestamp, query, and result count
-- Response logs include: timestamp, status code, and query
-- Logs are written using Flask's standard logging system
-- Check your application logs to monitor API usage
-
-### Testing
-
-Run the Brave Search integration tests:
-
-```bash
-pytest tests/test_brave_search.py -v
-```
-
-The test suite includes:
-- Successful API calls
-- Error handling and fallback mechanisms
-- Results parsing
-- Logging functionality
-- Mock data generation
-
-## Anthropic Claude API Integration
-
-This project now includes integration with the Anthropic Claude API for AI-driven natural language processing. The integration provides:
-
-### Features
-
-- **Synchronous text generation** - Generate text with blocking calls
-- **Asynchronous text generation** - Non-blocking async/await support
-- **Newsletter-specific generation** - Specialized function for newsletter content
-- **Prompt formatting utilities** - Helper functions for consistent prompts
-- **Response parsing** - Structured parsing of Claude API responses
-
-### API Endpoints
-
-#### 1. General Text Generation (`/api/claude/generate`)
-
-Generate text using Claude API with customizable parameters.
-
-**Request:**
-```bash
-curl -X POST http://localhost:5000/api/claude/generate \
-  -H "Content-Type: application/json" \
-  -d '{
-    "prompt": "Explain quantum computing in simple terms",
-    "model": "claude-3-5-sonnet-20241022",
-    "max_tokens": 1024,
-    "temperature": 1.0,
-    "system_prompt": "You are a helpful science teacher"
-  }'
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "text": "Quantum computing is...",
-  "model": "claude-3-5-sonnet-20241022",
-  "usage": {
-    "input_tokens": 10,
-    "output_tokens": 150
-  },
-  "stop_reason": "end_turn"
-}
-```
-
-#### 2. Newsletter Generation (`/api/claude/newsletter`)
-
-Generate newsletter content with subject line and body.
-
-**Request:**
-```bash
-curl -X POST http://localhost:5000/api/claude/newsletter \
-  -H "Content-Type: application/json" \
-  -d '{
-    "topic": "AI trends in 2024",
-    "style": "professional",
-    "max_tokens": 2000
-  }'
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "subject": "Weekly AI Update: 2024 Trends",
-  "content": "This week in AI...",
-  "model": "claude-3-5-sonnet-20241022",
-  "usage": {
-    "input_tokens": 50,
-    "output_tokens": 500
-  }
-}
-```
-
-### Using the Claude Service in Code
-
-```python
-from app import claude_service
-
-# Synchronous text generation
-result = claude_service.generate_text(
-    prompt="Explain machine learning",
-    model="claude-3-5-sonnet-20241022",
-    max_tokens=1024,
-    temperature=0.7
-)
-print(result['text'])
-
-# Asynchronous text generation
-result = await claude_service.generate_text_async(
-    prompt="Explain machine learning",
-    max_tokens=1024
-)
-
-# Newsletter-specific generation
-newsletter = claude_service.generate_newsletter_content_claude(
-    topic="Python programming",
-    style="technical"
-)
-print(newsletter['subject'])
-print(newsletter['content'])
-
-# Format prompts with utilities
-prompt = claude_service.format_prompt(
-    topic="Data Science",
-    style="professional",
-    max_length="comprehensive"
-)
-```
-
-### Available Models
-
-- `claude-3-5-sonnet-20241022` (default) - Best balance of speed and quality
-- `claude-3-opus-20240229` - Most capable model for complex tasks
-- `claude-3-haiku-20240307` - Fastest model for simpler tasks
-
-### Security Best Practices
-
-- Store the `ANTHROPIC_API_KEY` in environment variables or a secrets manager
-- Never commit API keys to source control
-- Use `.env` files for local development (already in `.gitignore`)
-- For production, use Heroku Config Vars or your platform's secrets management
-
-### Testing
-
-The Claude integration includes comprehensive tests:
-
-```bash
-# Run Claude service tests
-python -m pytest tests/test_claude_service.py -v
-
-# Run Claude route tests
-python -m pytest tests/test_claude_routes.py -v
-
 # Run all tests
-python -m pytest tests/ -v
+pytest
+
+# Run tests with verbose output
+pytest -v
+
+# Run specific test file
+pytest tests/test_routes.py
+
+# Generate HTML coverage report
+pytest --cov-report=html
+open htmlcov/index.html
 ```
+
+### Test Structure
+
+- **36 total tests** (100% passing)
+- **3 test files**: routes (basic), routes (comprehensive), services
+- **Routes coverage**: 100%
+- **Services coverage**: 95%
+
+For detailed testing documentation, see [TESTING.md](TESTING.md).
 
 ## Deployment
 

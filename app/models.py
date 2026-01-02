@@ -6,8 +6,9 @@ from flask_login import UserMixin
 
 Base = declarative_base()
 
+
 class User(Base, UserMixin):
-    __tablename__ = 'users'
+    __tablename__ = "users"
 
     id = Column(Integer, primary_key=True)
     email = Column(String(254), unique=True, nullable=False)
@@ -25,11 +26,12 @@ class User(Base, UserMixin):
     newsletters = relationship("Newsletter", back_populates="user")
     transactions = relationship("Transaction", back_populates="user")
 
+
 class Newsletter(Base):
-    __tablename__ = 'newsletters'
+    __tablename__ = "newsletters"
 
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     name = Column(String(100), nullable=False)
     topic = Column(String(100), nullable=False)
     schedule = Column(String(50), nullable=True)  # cron expression
@@ -39,11 +41,12 @@ class Newsletter(Base):
     user = relationship("User", back_populates="newsletters")
     issues = relationship("Issue", back_populates="newsletter")
 
+
 class Issue(Base):
-    __tablename__ = 'issues'
+    __tablename__ = "issues"
 
     id = Column(Integer, primary_key=True)
-    newsletter_id = Column(Integer, ForeignKey('newsletters.id'), nullable=False)
+    newsletter_id = Column(Integer, ForeignKey("newsletters.id"), nullable=False)
     subject = Column(String(200), nullable=False)
     content = Column(Text, nullable=False)
     sent_at = Column(DateTime, nullable=True)
@@ -51,11 +54,12 @@ class Issue(Base):
 
     newsletter = relationship("Newsletter", back_populates="issues")
 
+
 class Transaction(Base):
-    __tablename__ = 'transactions'
+    __tablename__ = "transactions"
 
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     paddle_transaction_id = Column(String(128), unique=True, nullable=False)
     paddle_subscription_id = Column(String(128), nullable=True)
     amount = Column(Numeric(10, 2), nullable=False)
