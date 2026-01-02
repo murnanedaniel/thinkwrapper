@@ -1,10 +1,20 @@
 import os
-from openai import OpenAI
+from openai import OpenAI, APIError, APIConnectionError, RateLimitError
 from flask import current_app
 import sendgrid
 from sendgrid.helpers.mail import Mail, From, To, Content
 import requests
 from datetime import datetime, timezone
+
+from .constants import (
+    DEFAULT_OPENAI_MODEL,
+    DEFAULT_MAX_TOKENS,
+    DEFAULT_TEMPERATURE,
+    DEFAULT_SEARCH_COUNT,
+    MAX_MOCK_RESULTS,
+    DEFAULT_FROM_EMAIL,
+    SEARCH_TIMEOUT,
+)
 
 
 # Configure OpenAI client (lazy initialization to avoid errors during testing)
@@ -45,13 +55,13 @@ def generate_newsletter_content(topic, style="concise"):
 
         # Using OpenAI v1.0+ API
         response = client.chat.completions.create(
-            model="gpt-4",
+            model=DEFAULT_OPENAI_MODEL,
             messages=[
                 {"role": "system", "content": "You are a newsletter writer."},
                 {"role": "user", "content": prompt},
             ],
-            max_tokens=1500,
-            temperature=0.7,
+            max_tokens=DEFAULT_MAX_TOKENS,
+            temperature=DEFAULT_TEMPERATURE,
         )
 
         # Process response to extract subject and content
@@ -63,8 +73,11 @@ def generate_newsletter_content(topic, style="concise"):
         body = "\n".join(lines[1:])
 
         return {"subject": subject, "content": body}
+    except (APIError, APIConnectionError, RateLimitError) as e:
+        current_app.logger.error(f"OpenAI API error: {str(e)}")
+        return None
     except Exception as e:
-        current_app.logger.error(f"OpenAI generation error: {str(e)}")
+        current_app.logger.error(f"Unexpected OpenAI generation error: {str(e)}")
         return None
 
 
@@ -87,7 +100,7 @@ def send_email(to_email, subject, content):
 
     try:
         sg = sendgrid.SendGridAPIClient(api_key=sg_api_key)
-        from_email_obj = From("newsletter@thinkwrapper.com")
+        from_email_obj = From(DEFAULT_FROM_EMAIL)
         to_email_obj = To(to_email)
         content_obj = Content("text/html", content)
 
@@ -123,7 +136,7 @@ def verify_paddle_webhook(data, signature):
     return True
 
 
-def search_brave(query, count=10, fallback_to_mock=True):
+def search_brave(query, count=DEFAULT_SEARCH_COUNT, fallback_to_mock=True):
     """
     Search using Brave Search API with fallback mechanism.
 
@@ -175,7 +188,7 @@ def search_brave(query, count=10, fallback_to_mock=True):
         }
         params = {"q": query, "count": count}
 
-        response = requests.get(url, headers=headers, params=params, timeout=10)
+        response = requests.get(url, headers=headers, params=params, timeout=SEARCH_TIMEOUT)
 
         # Log the API response
         _log_brave_search_response(response.status_code, query)
@@ -287,7 +300,7 @@ def _get_mock_search_results(query, count):
         dict: Mock search results in standard format
     """
     mock_results = []
-    actual_count = min(count, 5)  # Limit mock results to 5
+    actual_count = min(count, MAX_MOCK_RESULTS)  # Limit mock results
 
     for i in range(actual_count):
         mock_results.append(

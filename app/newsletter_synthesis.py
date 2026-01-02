@@ -5,9 +5,17 @@ This module provides functionality to synthesize and generate periodic newslette
 by collecting and transforming source content into newsletter summaries.
 """
 
+import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 import os
+
+from .constants import (
+    DEFAULT_OPENAI_MODEL,
+    SYNTHESIS_MAX_TOKENS,
+    DEFAULT_TEMPERATURE,
+    VALID_STYLES,
+)
 
 # Try to import Flask current_app, but make it optional for testing
 try:
@@ -16,6 +24,9 @@ try:
 except ImportError:
     _has_flask = False
     current_app = None
+
+# Module-level logger for use outside Flask context
+_logger = logging.getLogger(__name__)
 
 
 class NewsletterSynthesizer:
@@ -107,30 +118,39 @@ class NewsletterSynthesizer:
         """
         
         try:
-            # Using OpenAI's v1.0+ API structure
-            from openai import OpenAI
+            # Using OpenAI's v1.0+ API structure with chat completions
+            from openai import OpenAI, APIError, APIConnectionError, RateLimitError
             client = OpenAI(api_key=self.openai_api_key)
-            
-            response = client.completions.create(
-                model="gpt-3.5-turbo-instruct",
-                prompt=prompt,
-                max_tokens=800,
-                temperature=0.7
+
+            response = client.chat.completions.create(
+                model=DEFAULT_OPENAI_MODEL,
+                messages=[
+                    {"role": "system", "content": "You are a professional newsletter writer."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=SYNTHESIS_MAX_TOKENS,
+                temperature=DEFAULT_TEMPERATURE
             )
-            
-            content = response.choices[0].text.strip()
-            
+
+            content = response.choices[0].message.content.strip()
+
             # Extract subject and body
             lines = content.split('\n', 1)
             subject = lines[0].replace('Subject:', '').strip()
             body = lines[1].strip() if len(lines) > 1 else content
-            
+
             return {
                 'subject': subject,
                 'content': body
             }
+        except (APIError, APIConnectionError, RateLimitError) as e:
+            self._log_error(f"OpenAI API error: {str(e)}")
+            return self._generate_fallback_content(topic, content_items)
+        except ValueError as e:
+            self._log_error(f"Invalid response format: {str(e)}")
+            return self._generate_fallback_content(topic, content_items)
         except Exception as e:
-            self._log_error(f"Newsletter synthesis error: {str(e)}")
+            self._log_error(f"Unexpected newsletter synthesis error: {str(e)}")
             return self._generate_fallback_content(topic, content_items)
     
     def _generate_fallback_content(
@@ -215,18 +235,19 @@ class NewsletterSynthesizer:
     def _log_error(self, message: str):
         """
         Log error message, using Flask's logger if available.
-        
+
         Args:
             message: Error message to log
         """
         if _has_flask and current_app:
             try:
                 current_app.logger.error(message)
+                return
             except RuntimeError:
-                # Outside application context, use print as fallback
-                print(f"ERROR: {message}")
-        else:
-            print(f"ERROR: {message}")
+                # Outside application context, fall through to module logger
+                pass
+        # Use module-level logger as fallback
+        _logger.error(message)
 
 
 class NewsletterRenderer:
