@@ -33,6 +33,18 @@ def create_app(test_config=None):
         finally:
             db.close()
 
+    # Initialize Celery with Flask app context
+    from app.celery_config import celery
+    celery.conf.update(app.config)
+
+    class ContextTask(celery.Task):
+        """Make celery tasks work with Flask app context."""
+        def __call__(self, *args, **kwargs):
+            with app.app_context():
+                return self.run(*args, **kwargs)
+
+    celery.Task = ContextTask
+
     # Register routes
     from . import routes
 
