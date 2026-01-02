@@ -1,5 +1,6 @@
 import pytest
 import json
+from unittest.mock import patch, Mock
 from app import create_app
 
 
@@ -36,8 +37,14 @@ class TestHealthEndpoint:
 class TestNewsletterGeneration:
     """Test the newsletter generation endpoint."""
 
-    def test_generate_newsletter_success(self, client):
+    @patch('app.routes.generate_newsletter_async')
+    def test_generate_newsletter_success(self, mock_task, client):
         """Test successful newsletter generation request."""
+        # Mock the Celery task
+        mock_result = Mock()
+        mock_result.id = 'test-task-id-123'
+        mock_task.delay.return_value = mock_result
+        
         data = {
             "topic": "Artificial Intelligence",
             "name": "AI Weekly",
@@ -49,10 +56,10 @@ class TestNewsletterGeneration:
 
         assert response.status_code == 202
         response_data = response.json
+        assert response_data["success"] is True
         assert "status" in response_data
         assert response_data["status"] == "processing"
-        assert "topic" in response_data
-        assert response_data["topic"] == "Artificial Intelligence"
+        assert "task_id" in response_data
 
     def test_generate_newsletter_missing_topic(self, client):
         """Test newsletter generation with missing topic."""
@@ -63,8 +70,9 @@ class TestNewsletterGeneration:
 
         assert response.status_code == 400
         response_data = response.json
+        assert response_data["success"] is False
         assert "error" in response_data
-        assert "No topic provided" in response_data["error"]
+        assert "Topic is required" in response_data["error"]
 
     def test_generate_newsletter_empty_topic(self, client):
         """Test newsletter generation with empty topic."""
@@ -84,10 +92,11 @@ class TestNewsletterGeneration:
             "/api/generate", data=json.dumps(data), content_type="application/json"
         )
 
-        # Current behavior: accepts whitespace topics (this might be a bug)
-        assert response.status_code == 202
+        # Whitespace topics are now rejected by validation
+        assert response.status_code == 400
         response_data = response.json
-        assert "status" in response_data
+        assert response_data["success"] is False
+        assert "error" in response_data
 
     def test_generate_newsletter_invalid_json(self, client):
         """Test newsletter generation with invalid JSON."""
@@ -167,8 +176,14 @@ class TestRequestValidation:
         # Should either accept it or reject with appropriate error
         assert response.status_code in [202, 400, 413]
 
-    def test_special_characters_in_topic(self, client):
+    @patch('app.routes.generate_newsletter_async')
+    def test_special_characters_in_topic(self, mock_task, client):
         """Test handling of special characters in topic."""
+        # Mock the Celery task
+        mock_result = Mock()
+        mock_result.id = 'test-task-id-456'
+        mock_task.delay.return_value = mock_result
+        
         data = {
             "topic": 'AI & ML: 2024 Trends! (Part 1) - "Future Tech"',
             "name": "Special Chars Newsletter",
@@ -179,10 +194,17 @@ class TestRequestValidation:
 
         assert response.status_code == 202
         response_data = response.json
-        assert response_data["topic"] == data["topic"]
+        assert response_data["success"] is True
+        assert response_data["status"] == "processing"
 
-    def test_unicode_in_topic(self, client):
+    @patch('app.routes.generate_newsletter_async')
+    def test_unicode_in_topic(self, mock_task, client):
         """Test handling of unicode characters in topic."""
+        # Mock the Celery task
+        mock_result = Mock()
+        mock_result.id = 'test-task-id-789'
+        mock_task.delay.return_value = mock_result
+        
         data = {
             "topic": "Intelligence Artificielle et Машинное обучение 人工智能",
             "name": "Unicode Newsletter",
@@ -193,4 +215,5 @@ class TestRequestValidation:
 
         assert response.status_code == 202
         response_data = response.json
-        assert response_data["topic"] == data["topic"]
+        assert response_data["success"] is True
+        assert response_data["status"] == "processing"

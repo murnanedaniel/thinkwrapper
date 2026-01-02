@@ -28,7 +28,7 @@ def test_generate_newsletter(mock_task, client):
 
     response = client.post('/api/generate', json={
         'topic': 'Artificial Intelligence',
-        'style': 'concise'
+        'style': 'professional'
     })
     assert response.status_code == 202
     assert response.json['success'] is True
@@ -36,7 +36,7 @@ def test_generate_newsletter(mock_task, client):
     assert response.json['task_id'] == 'test-task-id-123'
 
     # Verify task was called
-    mock_task.delay.assert_called_once_with('Artificial Intelligence', 'concise')
+    mock_task.delay.assert_called_once_with('Artificial Intelligence', 'professional')
 
 
 @patch('app.routes.generate_newsletter_async')
@@ -54,13 +54,13 @@ def test_generate_newsletter_default_style(mock_task, client):
     assert response.json['task_id'] == 'test-task-id-456'
 
     # Verify task was called with default style
-    mock_task.delay.assert_called_once_with('AI News', 'concise')
+    mock_task.delay.assert_called_once_with('AI News', 'professional')
 
 
 def test_generate_newsletter_missing_topic(client):
     """Test the newsletter generation endpoint with missing topic."""
     response = client.post('/api/generate', json={
-        'style': 'concise'
+        'style': 'professional'
     })
     assert response.status_code == 400
     assert 'error' in response.json

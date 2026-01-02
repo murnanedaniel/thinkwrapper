@@ -53,12 +53,15 @@ class TestNewsletterSynthesizer:
         """Test successful newsletter synthesis with OpenAI."""
         synthesizer = NewsletterSynthesizer()
         
-        # Mock OpenAI client and response
+        # Mock OpenAI client and response for chat.completions API
         mock_client = Mock()
         mock_response = Mock()
-        mock_response.choices = [Mock()]
-        mock_response.choices[0].text = "AI Weekly Update\n\nThis week in AI has been exciting..."
-        mock_client.completions.create.return_value = mock_response
+        mock_message = Mock()
+        mock_message.content = "AI Weekly Update\n\nThis week in AI has been exciting..."
+        mock_choice = Mock()
+        mock_choice.message = mock_message
+        mock_response.choices = [mock_choice]
+        mock_client.chat.completions.create.return_value = mock_response
         mock_openai_class.return_value = mock_client
         
         content_items = [
@@ -84,9 +87,12 @@ class TestNewsletterSynthesizer:
         
         mock_client = Mock()
         mock_response = Mock()
-        mock_response.choices = [Mock()]
-        mock_response.choices[0].text = "Tech Brief\n\nCasual AI update..."
-        mock_client.completions.create.return_value = mock_response
+        mock_message = Mock()
+        mock_message.content = "Tech Brief\n\nCasual AI update..."
+        mock_choice = Mock()
+        mock_choice.message = mock_message
+        mock_response.choices = [mock_choice]
+        mock_client.chat.completions.create.return_value = mock_response
         mock_openai_class.return_value = mock_client
         
         content_items = [
@@ -101,9 +107,12 @@ class TestNewsletterSynthesizer:
         
         assert result is not None
         # Verify style was included in the prompt
-        mock_client.completions.create.assert_called_once()
-        call_args = mock_client.completions.create.call_args[1]
-        assert 'casual' in call_args['prompt']
+        mock_client.chat.completions.create.assert_called_once()
+        call_args = mock_client.chat.completions.create.call_args[1]
+        assert 'messages' in call_args
+        # Check that 'casual' appears in the user message
+        user_message = next(m for m in call_args['messages'] if m['role'] == 'user')
+        assert 'casual' in user_message['content']
     
     @patch('openai.OpenAI')
     @patch.dict('os.environ', {'OPENAI_API_KEY': 'test-key'})
@@ -417,9 +426,12 @@ class TestNewsletterIntegration:
         # Setup
         mock_client = Mock()
         mock_response = Mock()
-        mock_response.choices = [Mock()]
-        mock_response.choices[0].text = "Newsletter Title\n\nNewsletter content here."
-        mock_client.completions.create.return_value = mock_response
+        mock_message = Mock()
+        mock_message.content = "Newsletter Title\n\nNewsletter content here."
+        mock_choice = Mock()
+        mock_choice.message = mock_message
+        mock_response.choices = [mock_choice]
+        mock_client.chat.completions.create.return_value = mock_response
         mock_openai_class.return_value = mock_client
         
         synthesizer = NewsletterSynthesizer()
