@@ -426,9 +426,12 @@ class TestNewsletterIntegration:
         # Setup
         mock_client = Mock()
         mock_response = Mock()
-        mock_response.choices = [Mock()]
-        mock_response.choices[0].text = "Newsletter Title\n\nNewsletter content here."
-        mock_client.completions.create.return_value = mock_response
+        mock_message = Mock()
+        mock_message.content = "Newsletter Title\n\nNewsletter content here."
+        mock_choice = Mock()
+        mock_choice.message = mock_message
+        mock_response.choices = [mock_choice]
+        mock_client.chat.completions.create.return_value = mock_response
         mock_openai_class.return_value = mock_client
         
         synthesizer = NewsletterSynthesizer()

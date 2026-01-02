@@ -152,10 +152,11 @@ class TestClaudeNewsletterEndpoint:
         assert response.status_code == 200
         data = response.json
         assert data['success'] is True
-        assert data['subject'] == 'Weekly AI Newsletter'
-        assert data['content'] == 'This week in AI...'
-        assert data['model'] == 'claude-3-5-sonnet-20241022'
-        assert 'usage' in data
+        assert 'data' in data
+        assert data['data']['subject'] == 'Weekly AI Newsletter'
+        assert data['data']['content'] == 'This week in AI...'
+        assert data['data']['model'] == 'claude-3-5-sonnet-20241022'
+        assert 'usage' in data['data']
         mock_generate.assert_called_once()
     
     @patch('app.claude_service.generate_newsletter_content_claude')
