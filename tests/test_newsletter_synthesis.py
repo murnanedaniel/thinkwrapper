@@ -53,12 +53,15 @@ class TestNewsletterSynthesizer:
         """Test successful newsletter synthesis with OpenAI."""
         synthesizer = NewsletterSynthesizer()
         
-        # Mock OpenAI client and response
+        # Mock OpenAI client and response properly for chat completions API
         mock_client = Mock()
+        mock_message = Mock()
+        mock_message.content = "AI Weekly Update\n\nThis week in AI has been exciting..."
+        mock_choice = Mock()
+        mock_choice.message = mock_message
         mock_response = Mock()
-        mock_response.choices = [Mock()]
-        mock_response.choices[0].text = "AI Weekly Update\n\nThis week in AI has been exciting..."
-        mock_client.completions.create.return_value = mock_response
+        mock_response.choices = [mock_choice]
+        mock_client.chat.completions.create.return_value = mock_response
         mock_openai_class.return_value = mock_client
         
         content_items = [
@@ -73,6 +76,7 @@ class TestNewsletterSynthesizer:
         assert result is not None
         assert 'subject' in result
         assert 'content' in result
+        # Mock is now properly set up for chat completions, so we get the AI-generated subject
         assert result['subject'] == "AI Weekly Update"
         assert "This week in AI" in result['content']
     
@@ -82,11 +86,15 @@ class TestNewsletterSynthesizer:
         """Test newsletter synthesis with different styles."""
         synthesizer = NewsletterSynthesizer()
         
+        # Mock OpenAI client properly for chat completions API
         mock_client = Mock()
+        mock_message = Mock()
+        mock_message.content = "Tech Brief\n\nCasual AI update..."
+        mock_choice = Mock()
+        mock_choice.message = mock_message
         mock_response = Mock()
-        mock_response.choices = [Mock()]
-        mock_response.choices[0].text = "Tech Brief\n\nCasual AI update..."
-        mock_client.completions.create.return_value = mock_response
+        mock_response.choices = [mock_choice]
+        mock_client.chat.completions.create.return_value = mock_response
         mock_openai_class.return_value = mock_client
         
         content_items = [
@@ -100,10 +108,13 @@ class TestNewsletterSynthesizer:
         )
         
         assert result is not None
-        # Verify style was included in the prompt
-        mock_client.completions.create.assert_called_once()
-        call_args = mock_client.completions.create.call_args[1]
-        assert 'casual' in call_args['prompt']
+        # Verify style was included in the messages
+        mock_client.chat.completions.create.assert_called_once()
+        call_args = mock_client.chat.completions.create.call_args[1]
+        # Check that messages contain the style
+        messages = call_args['messages']
+        user_message = next(m for m in messages if m['role'] == 'user')
+        assert 'casual' in user_message['content']
     
     @patch('openai.OpenAI')
     @patch.dict('os.environ', {'OPENAI_API_KEY': 'test-key'})
@@ -414,12 +425,15 @@ class TestNewsletterIntegration:
     @patch.dict('os.environ', {'OPENAI_API_KEY': 'test-key'})
     def test_full_synthesis_and_render_workflow(self, mock_openai_class):
         """Test complete workflow from synthesis to rendering."""
-        # Setup
+        # Setup - mock OpenAI properly for chat completions API
         mock_client = Mock()
+        mock_message = Mock()
+        mock_message.content = "Newsletter Title\n\nNewsletter content here."
+        mock_choice = Mock()
+        mock_choice.message = mock_message
         mock_response = Mock()
-        mock_response.choices = [Mock()]
-        mock_response.choices[0].text = "Newsletter Title\n\nNewsletter content here."
-        mock_client.completions.create.return_value = mock_response
+        mock_response.choices = [mock_choice]
+        mock_client.chat.completions.create.return_value = mock_response
         mock_openai_class.return_value = mock_client
         
         synthesizer = NewsletterSynthesizer()
@@ -441,6 +455,7 @@ class TestNewsletterIntegration:
         assert html_output is not None
         assert text_output is not None
         assert '<!DOCTYPE html>' in html_output
+        # With proper mocking, the title is now correctly generated
         assert 'Newsletter Title' in text_output
     
     def test_config_workflow(self):

@@ -347,9 +347,9 @@ class TestPaymentRoutes:
         
         assert response.status_code == 200
         data = response.json
-        assert data['status'] == 'success'
-        assert data['checkout_url'] == 'https://checkout.paddle.com/ses_123'
-        assert data['session_id'] == 'ses_123'
+        assert data['success'] is True
+        assert data['data']['checkout_url'] == 'https://checkout.paddle.com/ses_123'
+        assert data['data']['session_id'] == 'ses_123'
         
         mock_service.create_checkout_session.assert_called_once_with(
             price_id='pri_123',
@@ -375,7 +375,7 @@ class TestPaymentRoutes:
         
         assert response.status_code == 400
         assert 'error' in response.json
-        assert 'required fields' in response.json['error'].lower()
+        assert 'price_id is required' in response.json['error']
     
     @patch('app.payment_service.get_paddle_service')
     def test_create_payment_checkout_service_failure(self, mock_get_service, client):
@@ -415,8 +415,9 @@ class TestPaymentRoutes:
         
         assert response.status_code == 200
         data = response.json
-        assert data['status'] == 'received'
-        assert data['event_type'] == 'transaction.completed'
+        assert data['success'] is True
+        assert data['data']['status'] == 'received'
+        assert data['data']['event_type'] == 'transaction.completed'
     
     def test_paddle_webhook_missing_signature(self, client):
         """Test webhook endpoint without signature."""
@@ -458,7 +459,7 @@ class TestPaymentRoutes:
         
         assert response.status_code == 200
         data = response.json
-        assert data['status'] == 'success'
+        assert data['success'] is True
         assert 'cancelled' in data['message'].lower()
         
         mock_service.cancel_subscription.assert_called_once_with(
