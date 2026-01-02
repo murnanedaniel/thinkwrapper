@@ -53,7 +53,8 @@ class TestNewsletterSynthesizer:
         """Test successful newsletter synthesis with OpenAI."""
         synthesizer = NewsletterSynthesizer()
         
-        # Mock OpenAI client and response properly for chat completions API
+        # Mock OpenAI client to match chat.completions.create API structure
+        # (updated from old completions.create API)
         mock_client = Mock()
         mock_message = Mock()
         mock_message.content = "AI Weekly Update\n\nThis week in AI has been exciting..."
@@ -76,7 +77,7 @@ class TestNewsletterSynthesizer:
         assert result is not None
         assert 'subject' in result
         assert 'content' in result
-        # Mock is now properly set up for chat completions, so we get the AI-generated subject
+        # With proper mock structure matching chat API, the test response is processed correctly
         assert result['subject'] == "AI Weekly Update"
         assert "This week in AI" in result['content']
     
@@ -455,7 +456,7 @@ class TestNewsletterIntegration:
         assert html_output is not None
         assert text_output is not None
         assert '<!DOCTYPE html>' in html_output
-        # With proper mocking, the title is now correctly generated
+        # With proper chat API mock structure, the mocked response is processed correctly
         assert 'Newsletter Title' in text_output
     
     def test_config_workflow(self):

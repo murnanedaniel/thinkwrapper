@@ -46,7 +46,8 @@ def test_generate_newsletter_default_style(mock_task, client):
     mock_result.id = 'test-task-id-456'
     mock_task.delay.return_value = mock_result
 
-    # Since 'concise' is not a valid style anymore, omitting style parameter will fail validation
+    # Since 'concise' is not in VALID_STYLES (['professional', 'casual', 'technical']),
+    # omitting the style parameter or using 'concise' will fail validation
     # Need to provide a valid style explicitly
     response = client.post('/api/generate', json={
         'topic': 'AI News',
