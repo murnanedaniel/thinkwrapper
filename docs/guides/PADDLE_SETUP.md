@@ -94,9 +94,29 @@ This guide walks you through setting up Paddle Payments in sandbox mode for test
 
 ## Testing Your Setup
 
-### Test 1: Verify Credentials
+### Test 1: Verify Configuration
 
-Run the Python REPL to test your configuration:
+Run the configuration verification script:
+
+```bash
+python scripts/verify_paddle_config.py
+```
+
+This will:
+- Check all required environment variables are set
+- Verify the payment service can initialize
+- Provide helpful feedback if anything is missing
+
+Expected output if everything is configured:
+```
+✓ Paddle is properly configured!
+```
+
+If you see errors, follow the instructions in the output.
+
+### Test 2: Verify Credentials (Alternative)
+
+Run the Python REPL to test your configuration manually:
 
 ```python
 python
@@ -109,7 +129,7 @@ python
 'your_api_key...'  # Should show your API key
 ```
 
-### Test 2: Create Test Checkout
+### Test 3: Create Test Checkout
 
 Use curl to test checkout creation:
 
@@ -139,7 +159,7 @@ Expected response:
 }
 ```
 
-### Test 3: Test Webhook Delivery
+### Test 4: Test Webhook Delivery
 
 #### Option A: Use ngrok for Local Testing
 
@@ -162,7 +182,7 @@ Expected response:
 5. Click **Send Test**
 6. Check your application logs to verify webhook was received
 
-### Test 4: Complete Test Payment
+### Test 5: Complete Test Payment
 
 1. Visit the `checkout_url` from Test 2
 2. Use Paddle's test card numbers:
@@ -172,7 +192,7 @@ Expected response:
 4. Complete the checkout
 5. Verify webhook was received in your application logs
 
-### Test 5: Run Automated Tests
+### Test 6: Run Automated Tests
 
 ```bash
 # Install test dependencies
