@@ -4,6 +4,8 @@
 
 ThinkWrapper uses Paddle for subscription billing and payment processing. This document covers the complete integration setup, testing procedures, and security considerations.
 
+**🚀 Quick Start:** For a step-by-step sandbox setup guide, see [Paddle Sandbox Setup Guide](../guides/PADDLE_SETUP.md)
+
 ## Table of Contents
 
 1. [Setup Instructions](#setup-instructions)
@@ -16,6 +18,8 @@ ThinkWrapper uses Paddle for subscription billing and payment processing. This d
 8. [Troubleshooting](#troubleshooting)
 
 ## Setup Instructions
+
+**New to Paddle?** Start with our [beginner-friendly sandbox setup guide](../guides/PADDLE_SETUP.md) for detailed step-by-step instructions.
 
 ### 1. Paddle Account Setup
 
@@ -261,6 +265,8 @@ Cancel an active subscription.
 
 The Paddle sandbox environment allows safe testing without real payments.
 
+**📖 For detailed testing instructions, see the [Paddle Sandbox Setup Guide](../guides/PADDLE_SETUP.md#testing-your-setup)**
+
 #### 1. Set Up Sandbox Mode
 
 ```bash
@@ -293,11 +299,27 @@ curl -X POST https://localhost:5000/api/payment/checkout \
 **Automated Test:**
 
 ```bash
-# Run payment integration tests
-python -m pytest tests/test_payment.py -v
+# Run all payment tests (unit + integration)
+python -m pytest tests/test_payment.py tests/test_payment_integration.py -v
+
+# Or run just integration tests
+python -m pytest tests/test_payment_integration.py -v
 ```
 
 #### 3. Test Webhook Handling
+
+**Using automated test script:**
+
+```bash
+# Run the webhook test script (requires Flask app running)
+python scripts/test_paddle_webhook.py
+```
+
+This script will:
+- Test all webhook event types
+- Verify signature validation
+- Test security measures
+- Provide detailed output
 
 **Using Paddle's webhook simulator:**
 
@@ -512,7 +534,10 @@ PADDLE_SANDBOX=true  # or false for production
 - `app/payment_service.py` - Payment service implementation
 - `app/routes.py` - Payment API endpoints
 - `app/models.py` - Transaction and user models
-- `tests/test_payment.py` - Payment integration tests
+- `tests/test_payment.py` - Unit tests for payment service
+- `tests/test_payment_integration.py` - Integration tests for full payment flow
+- `scripts/test_paddle_webhook.py` - Manual webhook testing script
+- `docs/guides/PADDLE_SETUP.md` - Step-by-step sandbox setup guide
 
 ### Support
 For issues with this integration, contact the development team or create an issue in the repository.
