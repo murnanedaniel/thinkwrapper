@@ -11,10 +11,13 @@ Environment Variables Required:
 
 import os
 import asyncio
+import logging
 from typing import Optional, Dict, Any, List
-from flask import current_app
 from anthropic import Anthropic, AsyncAnthropic
 from anthropic.types import Message
+
+# Module-level logger that works outside Flask context
+logger = logging.getLogger(__name__)
 
 
 # Initialize Claude clients
@@ -138,14 +141,9 @@ def generate_text(
     client = _get_client()
     
     if not client:
-        try:
-            if current_app:
-                current_app.logger.error("Anthropic API key not configured")
-        except RuntimeError:
-            # Outside application context
-            pass
+        logger.error("Anthropic API key not configured")
         return None
-    
+
     try:
         # Build message parameters
         message_params = {
@@ -156,24 +154,19 @@ def generate_text(
                 {"role": "user", "content": prompt}
             ]
         }
-        
+
         # Add system prompt if provided
         if system_prompt:
             message_params["system"] = system_prompt
-        
+
         # Make API call
         message = client.messages.create(**message_params)
-        
+
         # Parse and return response
         return parse_response(message)
-        
+
     except Exception as e:
-        try:
-            if current_app:
-                current_app.logger.error(f"Claude API error: {str(e)}")
-        except RuntimeError:
-            # Outside application context
-            pass
+        logger.error(f"Claude API error: {str(e)}")
         return None
 
 
@@ -202,16 +195,11 @@ async def generate_text_async(
         >>> print(result['text'])
     """
     client = _get_async_client()
-    
+
     if not client:
-        try:
-            if current_app:
-                current_app.logger.error("Anthropic API key not configured")
-        except RuntimeError:
-            # Outside application context
-            pass
+        logger.error("Anthropic API key not configured")
         return None
-    
+
     try:
         # Build message parameters
         message_params = {
@@ -222,24 +210,19 @@ async def generate_text_async(
                 {"role": "user", "content": prompt}
             ]
         }
-        
+
         # Add system prompt if provided
         if system_prompt:
             message_params["system"] = system_prompt
-        
+
         # Make async API call
         message = await client.messages.create(**message_params)
-        
+
         # Parse and return response
         return parse_response(message)
-        
+
     except Exception as e:
-        try:
-            if current_app:
-                current_app.logger.error(f"Claude API error (async): {str(e)}")
-        except RuntimeError:
-            # Outside application context
-            pass
+        logger.error(f"Claude API error (async): {str(e)}")
         return None
 
 
