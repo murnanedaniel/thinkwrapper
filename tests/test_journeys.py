@@ -421,7 +421,7 @@ class TestClaudeAPIJourney:
         """Test successful Claude text generation."""
         mock_claude.generate_text.return_value = {
             'text': 'Generated response',
-            'model': 'claude-3-5-sonnet-20241022',
+            'model': 'claude-haiku-4-5',
             'usage': {'input_tokens': 10, 'output_tokens': 50},
             'stop_reason': 'end_turn'
         }
@@ -447,7 +447,7 @@ class TestClaudeAPIJourney:
         mock_claude.generate_newsletter_content_claude.return_value = {
             'subject': 'AI Newsletter',
             'content': 'Newsletter content here',
-            'model': 'claude-3-5-sonnet-20241022',
+            'model': 'claude-haiku-4-5',
             'usage': {'input_tokens': 50, 'output_tokens': 500}
         }
 

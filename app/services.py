@@ -1,6 +1,6 @@
 import os
+import logging
 from openai import OpenAI, APIError, APIConnectionError, RateLimitError
-from flask import current_app
 import sendgrid
 from sendgrid.helpers.mail import Mail, From, To, Content
 import requests
@@ -15,6 +15,9 @@ from .constants import (
     DEFAULT_FROM_EMAIL,
     SEARCH_TIMEOUT,
 )
+
+# Module-level logger that works outside Flask context
+logger = logging.getLogger(__name__)
 
 
 # Configure OpenAI client (lazy initialization to avoid errors during testing)
@@ -50,7 +53,7 @@ def generate_newsletter_content(topic, style="concise"):
         # Get OpenAI client
         client = get_openai_client()
         if not client:
-            current_app.logger.error("OpenAI API key not configured")
+            logger.error("OpenAI API key not configured")
             return None
 
         # Using OpenAI v1.0+ API
@@ -74,10 +77,10 @@ def generate_newsletter_content(topic, style="concise"):
 
         return {"subject": subject, "content": body}
     except (APIError, APIConnectionError, RateLimitError) as e:
-        current_app.logger.error(f"OpenAI API error: {str(e)}")
+        logger.error(f"OpenAI API error: {str(e)}")
         return None
     except Exception as e:
-        current_app.logger.error(f"Unexpected OpenAI generation error: {str(e)}")
+        logger.error(f"Unexpected OpenAI generation error: {str(e)}")
         return None
 
 
@@ -95,7 +98,7 @@ def send_email(to_email, subject, content):
     """
     sg_api_key = os.environ.get("SENDGRID_API_KEY")
     if not sg_api_key:
-        current_app.logger.error("SendGrid API key not configured")
+        logger.error("SendGrid API key not configured")
         return False
 
     try:
@@ -115,7 +118,7 @@ def send_email(to_email, subject, content):
         response = sg.client.mail.send.post(request_body=mail.get())
         return response.status_code in [200, 202]
     except Exception as e:
-        current_app.logger.error(f"Email sending error: {str(e)}")
+        logger.error(f"Email sending error: {str(e)}")
         return False
 
 
@@ -163,10 +166,10 @@ def search_brave(query, count=DEFAULT_SEARCH_COUNT, fallback_to_mock=True):
 
     if not brave_api_key:
         error_msg = "Brave Search API key not configured"
-        current_app.logger.warning(error_msg)
+        logger.warning(error_msg)
 
         if fallback_to_mock:
-            current_app.logger.info("Falling back to mock search results")
+            logger.info("Falling back to mock search results")
             return _get_mock_search_results(query, count)
 
         return {
@@ -206,10 +209,10 @@ def search_brave(query, count=DEFAULT_SEARCH_COUNT, fallback_to_mock=True):
             }
         else:
             error_msg = f"Brave API returned status code {response.status_code}"
-            current_app.logger.error(error_msg)
+            logger.error(error_msg)
 
             if fallback_to_mock:
-                current_app.logger.info(
+                logger.info(
                     "Falling back to mock search results due to API error"
                 )
                 return _get_mock_search_results(query, count)
@@ -225,10 +228,10 @@ def search_brave(query, count=DEFAULT_SEARCH_COUNT, fallback_to_mock=True):
 
     except requests.exceptions.Timeout:
         error_msg = "Brave Search API request timed out"
-        current_app.logger.error(error_msg)
+        logger.error(error_msg)
 
         if fallback_to_mock:
-            current_app.logger.info(
+            logger.info(
                 "Falling back to mock search results due to timeout"
             )
             return _get_mock_search_results(query, count)
@@ -244,10 +247,10 @@ def search_brave(query, count=DEFAULT_SEARCH_COUNT, fallback_to_mock=True):
 
     except Exception as e:
         error_msg = f"Brave Search error: {str(e)}"
-        current_app.logger.error(error_msg)
+        logger.error(error_msg)
 
         if fallback_to_mock:
-            current_app.logger.info(
+            logger.info(
                 "Falling back to mock search results due to exception"
             )
             return _get_mock_search_results(query, count)
@@ -336,7 +339,7 @@ def _log_brave_search_request(query, count):
         "query": query,
         "count": count,
     }
-    current_app.logger.info(f"Brave Search Request: {log_entry}")
+    logger.info(f"Brave Search Request: {log_entry}")
 
 
 def _log_brave_search_response(status_code, query):
@@ -354,4 +357,4 @@ def _log_brave_search_response(status_code, query):
         "status_code": status_code,
         "query": query,
     }
-    current_app.logger.info(f"Brave Search Response: {log_entry}")
+    logger.info(f"Brave Search Response: {log_entry}")
