@@ -49,9 +49,9 @@ class TestNewsletterSynthesisRoutes:
         assert response.status_code == 200
         data = response.json
         assert data['success'] is True
-        assert data['subject'] == 'Test Newsletter'
-        assert 'rendered' in data
-        assert 'html' in data['rendered']
+        assert data['data']['subject'] == 'Test Newsletter'
+        assert 'rendered' in data['data']
+        assert 'html' in data['data']['rendered']
     
     def test_synthesize_newsletter_missing_newsletter_id(self, client):
         """Test synthesis without newsletter_id."""
@@ -69,7 +69,8 @@ class TestNewsletterSynthesisRoutes:
         })
         
         assert response.status_code == 400
-        assert 'topic' in response.json['error']
+        assert 'error' in response.json
+        assert 'Topic is required' in response.json['error']
     
     def test_synthesize_newsletter_no_data(self, client):
         """Test synthesis with no data."""
@@ -107,8 +108,8 @@ class TestNewsletterSynthesisRoutes:
         
         assert response.status_code == 200
         data = response.json
-        assert 'html' in data['rendered']
-        assert 'text' in data['rendered']
+        assert 'html' in data['data']['rendered']
+        assert 'text' in data['data']['rendered']
     
     @patch('app.routes.NewsletterSynthesizer')
     @patch('app.routes.NewsletterRenderer')
@@ -137,8 +138,8 @@ class TestNewsletterSynthesisRoutes:
         
         assert response.status_code == 200
         data = response.json
-        assert 'text' in data['rendered']
-        assert 'html' not in data['rendered']
+        assert 'text' in data['data']['rendered']
+        assert 'html' not in data['data']['rendered']
     
     @patch('app.routes.NewsletterSynthesizer')
     def test_synthesize_newsletter_synthesis_failure(self, mock_synthesizer_class, client):
@@ -195,7 +196,7 @@ class TestNewsletterSynthesisRoutes:
         
         assert response.status_code == 200
         data = response.json
-        assert data['metadata']['email_sent'] is True
+        assert data['data']['metadata']['email_sent'] is True
         mock_send_email.assert_called_once()
     
     def test_synthesize_newsletter_email_without_recipient(self, client):
@@ -207,7 +208,7 @@ class TestNewsletterSynthesisRoutes:
         })
         
         assert response.status_code == 400
-        assert 'email_to' in response.json['error']
+        assert 'Email is required' in response.json['error']
 
 
 class TestNewsletterConfigRoutes:
@@ -219,9 +220,10 @@ class TestNewsletterConfigRoutes:
         
         assert response.status_code == 200
         data = response.json
-        assert 'schedule' in data
-        assert 'delivery_format' in data
-        assert 'style' in data
+        assert data['success'] is True
+        assert 'schedule' in data['data']
+        assert 'delivery_format' in data['data']
+        assert 'style' in data['data']
     
     def test_update_newsletter_config_success(self, client):
         """Test updating newsletter configuration."""
@@ -234,8 +236,8 @@ class TestNewsletterConfigRoutes:
         assert response.status_code == 200
         data = response.json
         assert data['success'] is True
-        assert data['config']['schedule'] == 'daily'
-        assert data['config']['style'] == 'casual'
+        assert data['data']['config']['schedule'] == 'daily'
+        assert data['data']['config']['style'] == 'casual'
     
     def test_update_newsletter_config_invalid(self, client):
         """Test updating with invalid configuration."""
@@ -274,7 +276,7 @@ class TestNewsletterPreviewRoutes:
         assert response.status_code == 200
         data = response.json
         assert data['success'] is True
-        assert 'html' in data['rendered']
+        assert 'html' in data['data']['rendered']
     
     @patch('app.routes.NewsletterRenderer')
     def test_preview_newsletter_text(self, mock_renderer_class, client):
@@ -291,8 +293,8 @@ class TestNewsletterPreviewRoutes:
         
         assert response.status_code == 200
         data = response.json
-        assert 'text' in data['rendered']
-        assert 'html' not in data['rendered']
+        assert 'text' in data['data']['rendered']
+        assert 'html' not in data['data']['rendered']
     
     @patch('app.routes.NewsletterRenderer')
     def test_preview_newsletter_both_formats(self, mock_renderer_class, client):
@@ -310,8 +312,8 @@ class TestNewsletterPreviewRoutes:
         
         assert response.status_code == 200
         data = response.json
-        assert 'html' in data['rendered']
-        assert 'text' in data['rendered']
+        assert 'html' in data['data']['rendered']
+        assert 'text' in data['data']['rendered']
     
     def test_preview_newsletter_missing_subject(self, client):
         """Test preview without subject."""
