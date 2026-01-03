@@ -287,7 +287,7 @@ def claude_generate():
     Request body:
         {
             "prompt": "Your prompt text",
-            "model": "claude-3-5-sonnet-20241022" (optional),
+            "model": "claude-3-haiku-20240307" (optional),
             "max_tokens": 1024 (optional),
             "temperature": 1.0 (optional),
             "system_prompt": "System prompt" (optional)
@@ -297,7 +297,7 @@ def claude_generate():
         {
             "success": true,
             "text": "Generated text...",
-            "model": "claude-3-5-sonnet-20241022",
+            "model": "claude-3-haiku-20240307",
             "usage": {"input_tokens": 10, "output_tokens": 100}
         }
     """
@@ -308,7 +308,7 @@ def claude_generate():
         return APIResponse.error('No prompt provided')
 
     # Optional parameters
-    model = data.get('model', 'claude-3-5-sonnet-20241022')
+    model = data.get('model', 'claude-3-haiku-20240307')
     max_tokens = data.get('max_tokens', 1024)
     temperature = data.get('temperature', 1.0)
     system_prompt = data.get('system_prompt')
@@ -353,7 +353,7 @@ def claude_newsletter():
             "success": true,
             "subject": "Newsletter subject",
             "content": "Newsletter body...",
-            "model": "claude-3-5-sonnet-20241022",
+            "model": "claude-3-haiku-20240307",
             "usage": {"input_tokens": 50, "output_tokens": 500}
         }
     """

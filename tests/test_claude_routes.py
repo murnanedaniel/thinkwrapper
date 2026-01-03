@@ -25,7 +25,7 @@ class TestClaudeGenerateEndpoint:
         """Test successful text generation via API."""
         mock_generate.return_value = {
             'text': 'Generated text response',
-            'model': 'claude-3-5-sonnet-20241022',
+            'model': 'claude-3-haiku-20240307',
             'usage': {'input_tokens': 10, 'output_tokens': 50},
             'stop_reason': 'end_turn',
             'id': 'msg_123'
@@ -39,7 +39,7 @@ class TestClaudeGenerateEndpoint:
         data = response.json
         assert data['success'] is True
         assert data['data']['text'] == 'Generated text response'
-        assert data['data']['model'] == 'claude-3-5-sonnet-20241022'
+        assert data['data']['model'] == 'claude-3-haiku-20240307'
         assert 'usage' in data['data']
         mock_generate.assert_called_once()
     
@@ -80,7 +80,7 @@ class TestClaudeGenerateEndpoint:
     def test_claude_generate_missing_prompt(self, client):
         """Test endpoint with missing prompt."""
         response = client.post('/api/claude/generate', json={
-            'model': 'claude-3-5-sonnet-20241022'
+            'model': 'claude-3-haiku-20240307'
         })
         assert response.status_code == 400
         assert 'error' in response.json
@@ -112,7 +112,7 @@ class TestClaudeGenerateEndpoint:
         """Test that default parameters are used when not provided."""
         mock_generate.return_value = {
             'text': 'Response',
-            'model': 'claude-3-5-sonnet-20241022',
+            'model': 'claude-3-haiku-20240307',
             'usage': {'input_tokens': 5, 'output_tokens': 25},
             'stop_reason': 'end_turn',
             'id': 'msg_789'
@@ -125,7 +125,7 @@ class TestClaudeGenerateEndpoint:
         assert response.status_code == 200
         # Verify defaults were used
         call_kwargs = mock_generate.call_args[1]
-        assert call_kwargs['model'] == 'claude-3-5-sonnet-20241022'
+        assert call_kwargs['model'] == 'claude-3-haiku-20240307'
         assert call_kwargs['max_tokens'] == 1024
         assert call_kwargs['temperature'] == 1.0
         assert call_kwargs['system_prompt'] is None
@@ -140,7 +140,7 @@ class TestClaudeNewsletterEndpoint:
         mock_generate.return_value = {
             'subject': 'Weekly AI Newsletter',
             'content': 'This week in AI...',
-            'model': 'claude-3-5-sonnet-20241022',
+            'model': 'claude-3-haiku-20240307',
             'usage': {'input_tokens': 30, 'output_tokens': 200}
         }
         
@@ -153,7 +153,7 @@ class TestClaudeNewsletterEndpoint:
         assert data['success'] is True
         assert data['data']['subject'] == 'Weekly AI Newsletter'
         assert data['data']['content'] == 'This week in AI...'
-        assert data['data']['model'] == 'claude-3-5-sonnet-20241022'
+        assert data['data']['model'] == 'claude-3-haiku-20240307'
         assert 'usage' in data['data']
         mock_generate.assert_called_once()
     
@@ -163,7 +163,7 @@ class TestClaudeNewsletterEndpoint:
         mock_generate.return_value = {
             'subject': 'Technical Brief',
             'content': 'Technical content...',
-            'model': 'claude-3-5-sonnet-20241022',
+            'model': 'claude-3-haiku-20240307',
             'usage': {'input_tokens': 25, 'output_tokens': 150}
         }
         
@@ -185,7 +185,7 @@ class TestClaudeNewsletterEndpoint:
         mock_generate.return_value = {
             'subject': 'Newsletter',
             'content': 'Content...',
-            'model': 'claude-3-5-sonnet-20241022',
+            'model': 'claude-3-haiku-20240307',
             'usage': {'input_tokens': 20, 'output_tokens': 100}
         }
         
@@ -243,7 +243,7 @@ class TestClaudeNewsletterEndpoint:
         mock_generate.return_value = {
             'subject': 'Test Subject',
             'content': 'Test Content',
-            'model': 'claude-3-5-sonnet-20241022',
+            'model': 'claude-3-haiku-20240307',
             'usage': {'input_tokens': 15, 'output_tokens': 80}
         }
         
@@ -277,7 +277,7 @@ class TestClaudeEndpointsIntegration:
         """Test that the two endpoints are independent."""
         mock_generate.return_value = {
             'text': 'Text response',
-            'model': 'claude-3-5-sonnet-20241022',
+            'model': 'claude-3-haiku-20240307',
             'usage': {'input_tokens': 5, 'output_tokens': 10},
             'stop_reason': 'end_turn',
             'id': 'msg_1'
@@ -285,7 +285,7 @@ class TestClaudeEndpointsIntegration:
         mock_newsletter.return_value = {
             'subject': 'Subject',
             'content': 'Content',
-            'model': 'claude-3-5-sonnet-20241022',
+            'model': 'claude-3-haiku-20240307',
             'usage': {'input_tokens': 10, 'output_tokens': 20}
         }
         
