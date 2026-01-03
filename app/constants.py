@@ -7,7 +7,7 @@ to improve maintainability and testability.
 
 # AI Model Configuration
 DEFAULT_OPENAI_MODEL = "gpt-4"
-DEFAULT_CLAUDE_MODEL = "claude-3-haiku-20240307"
+DEFAULT_CLAUDE_MODEL = "claude-haiku-4-5"
 
 # Token limits
 DEFAULT_MAX_TOKENS = 1024

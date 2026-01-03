@@ -116,7 +116,7 @@ def parse_response(message: Message) -> Dict[str, Any]:
 
 def generate_text(
     prompt: str,
-    model: str = "claude-3-haiku-20240307",
+    model: str = "claude-haiku-4-5",
     max_tokens: int = 1024,
     temperature: float = 1.0,
     system_prompt: Optional[str] = None
@@ -172,7 +172,7 @@ def generate_text(
 
 async def generate_text_async(
     prompt: str,
-    model: str = "claude-3-haiku-20240307",
+    model: str = "claude-haiku-4-5",
     max_tokens: int = 1024,
     temperature: float = 1.0,
     system_prompt: Optional[str] = None

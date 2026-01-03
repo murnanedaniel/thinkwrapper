@@ -21,7 +21,7 @@ class MockTextBlock:
 
 class MockMessage:
     """Mock for Anthropic Message response."""
-    def __init__(self, text, model="claude-3-haiku-20240307", stop_reason="end_turn"):
+    def __init__(self, text, model="claude-haiku-4-5", stop_reason="end_turn"):
         self.content = [MockTextBlock(text)]
         self.model = model
         self.usage = Usage(input_tokens=10, output_tokens=100)
@@ -88,7 +88,7 @@ class TestResponseParsing:
         assert 'stop_reason' in result
         assert 'id' in result
         assert result['text'] == "This is test content"
-        assert result['model'] == "claude-3-haiku-20240307"
+        assert result['model'] == "claude-haiku-4-5"
         assert result['usage']['input_tokens'] == 10
         assert result['usage']['output_tokens'] == 100
     
@@ -126,7 +126,7 @@ class TestSyncTextGeneration:
         
         assert result is not None
         assert result['text'] == "Generated text content"
-        assert result['model'] == "claude-3-haiku-20240307"
+        assert result['model'] == "claude-haiku-4-5"
         mock_client.messages.create.assert_called_once()
     
     @patch('app.claude_service._get_client')
@@ -204,7 +204,7 @@ class TestAsyncTextGeneration:
         
         assert result is not None
         assert result['text'] == "Async generated text"
-        assert result['model'] == "claude-3-haiku-20240307"
+        assert result['model'] == "claude-haiku-4-5"
         mock_client.messages.create.assert_called_once()
     
     @pytest.mark.asyncio
@@ -218,7 +218,7 @@ class TestAsyncTextGeneration:
         
         result = await claude_service.generate_text_async(
             prompt="Async prompt",
-            model="claude-3-haiku-20240307",
+            model="claude-haiku-4-5",
             max_tokens=300,
             temperature=0.8,
             system_prompt="System context"
@@ -227,7 +227,7 @@ class TestAsyncTextGeneration:
         assert result is not None
         mock_client.messages.create.assert_called_once()
         call_kwargs = mock_client.messages.create.call_args[1]
-        assert call_kwargs['model'] == "claude-3-haiku-20240307"
+        assert call_kwargs['model'] == "claude-haiku-4-5"
         assert call_kwargs['max_tokens'] == 300
         assert call_kwargs['temperature'] == 0.8
         assert call_kwargs['system'] == "System context"
