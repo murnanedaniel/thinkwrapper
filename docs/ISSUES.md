@@ -149,3 +149,137 @@ Update existing tests per Issue #1, which should restore coverage to >65%.
 - [x] Created test_journeys.py with 36 tests
 - [x] All journey tests passing
 - [x] Tests cover all major user flows
+
+---
+
+## Integration Gaps (Parallelizable Work)
+
+The following issues are **independent** and can be worked on in parallel by different developers.
+
+### Issue #4: Integrate Brave Search into Newsletter Flow
+
+**Priority:** High
+**Type:** Feature Integration
+**Parallelizable:** Yes
+
+#### Summary
+`search_brave()` exists in `app/services.py` but is **never called** from the newsletter generation flow. The Claude newsletter generator uses placeholder URLs instead of real, researched links.
+
+#### Current State
+- `search_brave()` function works and returns real results
+- `generate_newsletter_content_claude()` prompts Claude to "use placeholder URLs"
+- No integration between search and content generation
+
+#### Required Work
+1. Modify `generate_newsletter_content_claude()` to:
+   - Call `search_brave(topic)` to get relevant articles
+   - Include real URLs in the prompt context
+   - Generate newsletter with actual, verified links
+2. Add error handling for search failures
+3. Update tests to verify integration
+
+#### Files to Modify
+- `app/claude_service.py` - Add search integration
+- `app/services.py` - Potentially add combined function
+- `tests/test_claude_service.py` - Add integration tests
+
+---
+
+### Issue #5: Configure OpenAI Integration for Async Newsletter
+
+**Priority:** Medium
+**Type:** Configuration/Integration
+**Parallelizable:** Yes
+
+#### Summary
+The Celery-based newsletter generation (`/api/generate`) uses OpenAI but there's no OpenAI API key configured.
+
+#### Required Work
+1. Add `OPENAI_API_KEY` to `.env.example`
+2. Test with real OpenAI API calls
+3. Consider adding Claude as fallback/alternative
+
+#### Files to Modify
+- `.env.example` - Document the key
+- `app/services.py` - Verify OpenAI integration works
+- `app/tasks.py` - Test Celery task execution
+
+---
+
+### Issue #6: Configure Google OAuth
+
+**Priority:** Medium
+**Type:** Configuration
+**Parallelizable:** Yes
+
+#### Summary
+Google OAuth endpoints exist but require credentials.
+
+#### Required Work
+1. Document OAuth setup in README or dedicated guide
+2. Add `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` to `.env.example`
+3. Test full OAuth flow with real Google credentials
+4. Add integration tests for OAuth callback
+
+#### Files to Modify
+- `app/auth_routes.py` - Verify OAuth flow
+- `.env.example` - Document credentials
+- `docs/guides/` - Add OAuth setup guide
+
+---
+
+### Issue #7: Configure Paddle Payments
+
+**Priority:** Medium
+**Type:** Configuration
+**Parallelizable:** Yes
+
+#### Summary
+Payment service exists but Paddle is not configured.
+
+#### Required Work
+1. Document Paddle sandbox setup
+2. Add Paddle credentials to `.env.example`
+3. Test webhook handling
+4. Add integration tests for payment flow
+
+#### Files to Modify
+- `app/payment_service.py` - Verify integration
+- `.env.example` - Document credentials
+- `docs/guides/` - Add Paddle setup guide
+
+---
+
+### Issue #8: Configure SendGrid Email
+
+**Priority:** Medium
+**Type:** Configuration
+**Parallelizable:** Yes
+
+#### Summary
+Email sending function exists but SendGrid is not configured.
+
+#### Required Work
+1. Add `SENDGRID_API_KEY` to `.env.example`
+2. Test email delivery with real SendGrid account
+3. Add email templates if needed
+4. Add integration tests
+
+#### Files to Modify
+- `app/services.py` - Verify `send_email()` function
+- `.env.example` - Document API key
+- `tests/` - Add email integration tests
+
+---
+
+## Summary of Parallelizable Issues
+
+| Issue | Priority | Independent? | Estimated Effort |
+|-------|----------|--------------|------------------|
+| #4 Brave Search Integration | High | ✅ Yes | Medium |
+| #5 OpenAI Configuration | Medium | ✅ Yes | Low |
+| #6 Google OAuth | Medium | ✅ Yes | Low |
+| #7 Paddle Payments | Medium | ✅ Yes | Medium |
+| #8 SendGrid Email | Medium | ✅ Yes | Low |
+
+All 5 issues can be assigned to different developers and worked on simultaneously.
