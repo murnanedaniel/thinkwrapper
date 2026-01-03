@@ -156,31 +156,45 @@ Update existing tests per Issue #1, which should restore coverage to >65%.
 
 The following issues are **independent** and can be worked on in parallel by different developers.
 
-### Issue #4: Integrate Brave Search into Newsletter Flow
+### Issue #4: Integrate Brave Search into Newsletter Flow (CRITICAL)
 
-**Priority:** High
+**Priority:** HIGH - Core Feature Broken
 **Type:** Feature Integration
 **Parallelizable:** Yes
 
-#### Summary
-`search_brave()` exists in `app/services.py` but is **never called** from the newsletter generation flow. The Claude newsletter generator uses placeholder URLs instead of real, researched links.
+#### Intended Flow (per user requirements)
+1. User subscribes with **topic** + **frequency** (daily/weekly/monthly)
+2. At scheduled time, run `search_brave(topic)` to get **current articles**
+3. Pass those real results to Claude to **synthesize** into a newsletter
+4. Send via email with **real, verified links**
 
-#### Current State
-- `search_brave()` function works and returns real results
-- `generate_newsletter_content_claude()` prompts Claude to "use placeholder URLs"
-- No integration between search and content generation
+#### Current State (BROKEN)
+- `search_brave()` exists but is **NEVER CALLED**
+- `generate_newsletter_content_claude()` tells Claude to "use placeholder URLs"
+- Newsletter contains **hallucinated/fake links** instead of real content
+- The whole point of Brave Search integration is lost
 
 #### Required Work
-1. Modify `generate_newsletter_content_claude()` to:
-   - Call `search_brave(topic)` to get relevant articles
-   - Include real URLs in the prompt context
-   - Generate newsletter with actual, verified links
-2. Add error handling for search failures
-3. Update tests to verify integration
+1. Create `generate_newsletter_with_search(topic, style)` function that:
+   ```python
+   def generate_newsletter_with_search(topic, style="professional"):
+       # 1. Search for current articles
+       search_results = search_brave(topic, count=5)
+
+       # 2. Format search results for Claude
+       articles = format_search_results(search_results)
+
+       # 3. Pass to Claude with real URLs
+       return generate_newsletter_from_articles(topic, articles, style)
+   ```
+2. Update Claude prompt to synthesize from provided articles (not make up content)
+3. Update `/api/claude/newsletter` endpoint to use new function
+4. Add tests verifying real URLs are included
 
 #### Files to Modify
-- `app/claude_service.py` - Add search integration
-- `app/services.py` - Potentially add combined function
+- `app/claude_service.py` - Add search-integrated generation
+- `app/services.py` - Add `generate_newsletter_with_search()`
+- `app/routes.py` - Update endpoint
 - `tests/test_claude_service.py` - Add integration tests
 
 ---
@@ -272,14 +286,68 @@ Email sending function exists but SendGrid is not configured.
 
 ---
 
+### Issue #9: Implement Scheduled Newsletter Task (CRITICAL)
+
+**Priority:** HIGH - Core Feature Broken
+**Type:** Feature Implementation
+**Parallelizable:** Yes (after #4 is done)
+
+#### Summary
+`check_scheduled_newsletters` Celery task exists but is a **stub with placeholder code**. It doesn't actually query newsletters or send them.
+
+#### Current State (BROKEN)
+```python
+# From app/tasks.py - lines 183-210 are ALL COMMENTED OUT
+# The task just logs "Checking for scheduled newsletters..." and returns
+checked_count = 0
+sent_count = 0
+# ... all the actual logic is commented placeholder code
+```
+
+#### Required Work
+1. Implement actual newsletter scheduling:
+   ```python
+   @celery.task
+   def check_scheduled_newsletters():
+       # Query newsletters due for sending
+       due_newsletters = Newsletter.query.filter(
+           Newsletter.schedule.isnot(None),
+           Newsletter.is_due()  # Based on schedule + last_sent_at
+       ).all()
+
+       for newsletter in due_newsletters:
+           # Use Issue #4's generate_newsletter_with_search()
+           content = generate_newsletter_with_search(newsletter.topic)
+           send_email(newsletter.user.email, content)
+           newsletter.last_sent_at = datetime.utcnow()
+   ```
+2. Add `is_due()` method to Newsletter model based on schedule
+3. Handle schedule parsing (daily/weekly/monthly/cron)
+4. Add tests for scheduler
+
+#### Files to Modify
+- `app/tasks.py` - Implement `check_scheduled_newsletters()`
+- `app/models.py` - Add `is_due()` method
+- `tests/test_tasks.py` - Add scheduler tests
+
+#### Dependencies
+- Requires Issue #4 (Brave Search integration) to be completed first
+
+---
+
 ## Summary of Parallelizable Issues
 
 | Issue | Priority | Independent? | Estimated Effort |
 |-------|----------|--------------|------------------|
-| #4 Brave Search Integration | High | ✅ Yes | Medium |
+| #4 Brave Search Integration | **HIGH** | ✅ Yes | Medium |
 | #5 OpenAI Configuration | Medium | ✅ Yes | Low |
 | #6 Google OAuth | Medium | ✅ Yes | Low |
 | #7 Paddle Payments | Medium | ✅ Yes | Medium |
 | #8 SendGrid Email | Medium | ✅ Yes | Low |
+| #9 Scheduled Newsletter Task | **HIGH** | ⚠️ After #4 | Medium |
 
-All 5 issues can be assigned to different developers and worked on simultaneously.
+**Recommended order:**
+1. **#4 first** (Brave Search integration) - unlocks the core feature
+2. **#8 in parallel** (SendGrid) - needed for sending
+3. **#9 after #4 + #8** (Scheduler) - ties it all together
+4. **#5, #6, #7** can be done anytime in parallel
