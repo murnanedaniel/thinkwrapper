@@ -323,10 +323,13 @@ class TestPaddleIntegration:
             json=webhook_payload,
             headers={'Paddle-Signature': 'valid_signature'}
         )
-        # Note: Current implementation accepts duplicates
-        # In production, you should track event_id to prevent replay attacks
+        # Note: Current implementation accepts duplicates as signature is valid
+        # SECURITY RECOMMENDATION: In production, implement idempotency by:
+        # 1. Storing event_id in database when processing webhook
+        # 2. Rejecting webhooks with duplicate event_id
+        # 3. Using a time window (e.g., 24 hours) to prevent unbounded storage
         assert response2.status_code == 200
-        # TODO: Implement idempotency checks using event_id
+        # TODO: Implement idempotency checks using event_id tracking
     
     @patch('app.payment_service.requests.post')
     @patch.dict('os.environ', {

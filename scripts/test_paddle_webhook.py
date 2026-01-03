@@ -21,6 +21,7 @@ import json
 import hmac
 import hashlib
 import requests
+import uuid
 from datetime import datetime
 from dotenv import load_dotenv
 
@@ -79,7 +80,7 @@ def send_webhook(event_type: str, event_data: dict) -> tuple:
     """
     webhook_payload = {
         'event_type': event_type,
-        'event_id': f'evt_test_{datetime.now().timestamp()}',
+        'event_id': f'evt_test_{uuid.uuid4().hex[:16]}',
         'occurred_at': datetime.now().isoformat() + 'Z',
         'data': event_data
     }

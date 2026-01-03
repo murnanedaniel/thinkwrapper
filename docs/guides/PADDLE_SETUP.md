@@ -184,13 +184,17 @@ Expected response:
 
 ### Test 5: Complete Test Payment
 
-1. Visit the `checkout_url` from Test 2
-2. Use Paddle's test card numbers:
-   - **Success**: `4242 4242 4242 4242`
-   - **Decline**: `4000 0000 0000 0002`
-3. Use any future expiry date and any CVV
-4. Complete the checkout
-5. Verify webhook was received in your application logs
+1. Visit the `checkout_url` from Test 3
+2. Use Paddle's test payment methods (in sandbox mode):
+   - **Visa (Success)**: `4242 4242 4242 4242`
+   - **Visa (Decline)**: `4000 0000 0000 0002`
+   - Use any future expiry date (e.g., 12/25) and any 3-digit CVV (e.g., 123)
+   - For postal code, use any valid format (e.g., 12345 or SW1A 1AA)
+3. Complete the checkout form
+4. Verify webhook was received in your application logs
+5. Check that transaction appears in Paddle dashboard
+
+**Note**: Paddle's test cards may change. Always refer to [Paddle's testing documentation](https://developer.paddle.com/concepts/payment-methods/credit-debit-card) for the most current test card numbers.
 
 ### Test 6: Run Automated Tests
 
