@@ -299,3 +299,109 @@ on the first line, followed by the newsletter content."""
         'model': result['model'],
         'usage': result['usage']
     }
+
+
+def generate_newsletter_with_search(
+    topic: str,
+    style: str = "professional",
+    max_tokens: int = 2000,
+    search_count: int = 10
+) -> Optional[Dict[str, Any]]:
+    """
+    Generate newsletter content using Claude API with real search results from Brave Search.
+    
+    This function integrates Brave Search to get current, real articles and then uses
+    Claude to synthesize them into a compelling newsletter with verified links.
+    
+    Args:
+        topic: The newsletter topic
+        style: The writing style
+        max_tokens: Maximum tokens for the response
+        search_count: Number of search results to fetch from Brave Search
+        
+    Returns:
+        Dictionary with 'subject', 'content', 'articles', and metadata, or None on error
+        
+    Examples:
+        >>> newsletter = generate_newsletter_with_search("AI trends", "technical")
+        >>> print(newsletter['subject'])
+        >>> print(newsletter['content'])
+        >>> print(newsletter['articles'])  # List of real articles used
+    """
+    from .services import search_brave
+    
+    # Get real search results from Brave Search
+    logger.info(f"Searching Brave for topic: {topic}")
+    search_results = search_brave(query=topic, count=search_count, fallback_to_mock=True)
+    
+    if not search_results.get('success') or not search_results.get('results'):
+        logger.error(f"Failed to get search results for topic: {topic}")
+        return None
+    
+    articles = search_results['results']
+    logger.info(f"Retrieved {len(articles)} articles from {search_results['source']}")
+    
+    # Format articles for the prompt
+    articles_text = "\n\n".join([
+        f"Article {i+1}:\nTitle: {article['title']}\nURL: {article['url']}\nDescription: {article['description']}"
+        for i, article in enumerate(articles[:10])  # Limit to top 10 to avoid token overflow
+    ])
+    
+    # Create a specialized prompt with real article data
+    prompt = f"""Create a newsletter about {topic} using the following real articles as sources.
+
+Style: {style}
+
+Real Articles to Reference:
+{articles_text}
+
+Please structure your response as follows:
+1. Start with a compelling subject line on the first line (prefix with "Subject: ")
+2. Follow with the newsletter body including:
+   - An engaging introduction
+   - 3-5 interesting segments synthesizing insights from the articles above
+   - Include REAL URLs from the articles provided (not placeholder URLs)
+   - Reference specific articles by title and include their actual URLs
+   - A brief conclusion
+
+IMPORTANT: Use only the real URLs provided above. Do not make up or hallucinate any URLs.
+Keep the tone {style} and make it engaging for readers."""
+    
+    # Use a system prompt to reinforce using real data
+    system_prompt = """You are an expert newsletter writer who synthesizes real articles into 
+compelling newsletters. You MUST use only the real article URLs provided to you - never make up 
+or hallucinate URLs. Always start with a subject line prefixed with "Subject: " on the first line, 
+followed by the newsletter content with real, verified links from the provided articles."""
+    
+    # Generate content
+    result = generate_text(
+        prompt=prompt,
+        max_tokens=max_tokens,
+        temperature=0.7,
+        system_prompt=system_prompt
+    )
+    
+    if not result:
+        return None
+    
+    # Parse the response to extract subject and body
+    content = result['text'].strip()
+    lines = content.split('\n', 1)
+    
+    # Extract subject line
+    subject = lines[0]
+    if subject.lower().startswith('subject:'):
+        subject = subject[8:].strip()
+    
+    # Extract body (everything after the first line)
+    body = lines[1].strip() if len(lines) > 1 else ""
+    
+    return {
+        'subject': subject,
+        'content': body,
+        'articles': articles,
+        'search_source': search_results['source'],
+        'total_articles': len(articles),
+        'model': result['model'],
+        'usage': result['usage']
+    }

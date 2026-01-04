@@ -339,13 +339,15 @@ def claude_generate():
 @require_json
 def claude_newsletter():
     """
-    Generate newsletter content using Claude API (demo endpoint).
+    Generate newsletter content using Claude API with Brave Search integration.
 
     Request body:
         {
             "topic": "Newsletter topic",
             "style": "professional" (optional),
-            "max_tokens": 2000 (optional)
+            "max_tokens": 2000 (optional),
+            "search_count": 10 (optional),
+            "use_search": true (optional, defaults to true for real URLs)
         }
 
     Response:
@@ -353,6 +355,8 @@ def claude_newsletter():
             "success": true,
             "subject": "Newsletter subject",
             "content": "Newsletter body...",
+            "articles": [{"title": "...", "url": "...", "description": "..."}],
+            "search_source": "brave" or "mock",
             "model": "claude-haiku-4-5",
             "usage": {"input_tokens": 50, "output_tokens": 500}
         }
@@ -369,18 +373,29 @@ def claude_newsletter():
     # Optional parameters
     style = data.get('style', 'professional')
     max_tokens = data.get('max_tokens', 2000)
+    search_count = data.get('search_count', 10)
+    use_search = data.get('use_search', True)
 
     # Validate style
     is_valid, error_msg = InputValidator.validate_style(style)
     if not is_valid:
         return APIResponse.error(error_msg)
 
-    # Generate newsletter using Claude
-    result = claude_service.generate_newsletter_content_claude(
-        topic=topic,
-        style=style,
-        max_tokens=max_tokens
-    )
+    # Generate newsletter using Claude with Brave Search integration
+    if use_search:
+        result = claude_service.generate_newsletter_with_search(
+            topic=topic,
+            style=style,
+            max_tokens=max_tokens,
+            search_count=search_count
+        )
+    else:
+        # Fallback to old method without search (for backwards compatibility)
+        result = claude_service.generate_newsletter_content_claude(
+            topic=topic,
+            style=style,
+            max_tokens=max_tokens
+        )
 
     if result is None:
         return APIResponse.error(
@@ -388,12 +403,21 @@ def claude_newsletter():
             status_code=500
         )
 
-    return APIResponse.success(data={
+    # Build response data
+    response_data = {
         'subject': result['subject'],
         'content': result['content'],
         'model': result['model'],
         'usage': result['usage']
-    })
+    }
+    
+    # Add search-specific fields if available
+    if 'articles' in result:
+        response_data['articles'] = result['articles']
+        response_data['search_source'] = result['search_source']
+        response_data['total_articles'] = result['total_articles']
+
+    return APIResponse.success(data=response_data)
 
 
 @bp.route('/api/payment/checkout', methods=['POST'])
