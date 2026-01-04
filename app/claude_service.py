@@ -301,6 +301,34 @@ on the first line, followed by the newsletter content."""
     }
 
 
+def _sanitize_text_for_prompt(text: str) -> str:
+    """
+    Sanitize text from external sources to prevent prompt injection.
+    
+    Args:
+        text: Text to sanitize
+        
+    Returns:
+        Sanitized text safe for use in prompts
+    """
+    if not text:
+        return ""
+    
+    # Remove or escape potentially problematic characters/sequences
+    # Replace newlines with spaces to prevent prompt structure manipulation
+    sanitized = text.replace('\n', ' ').replace('\r', ' ')
+    
+    # Remove multiple spaces
+    sanitized = ' '.join(sanitized.split())
+    
+    # Limit length to prevent token overflow from malicious input
+    max_length = 500
+    if len(sanitized) > max_length:
+        sanitized = sanitized[:max_length] + "..."
+    
+    return sanitized
+
+
 def generate_newsletter_with_search(
     topic: str,
     style: str = "professional",
@@ -341,37 +369,39 @@ def generate_newsletter_with_search(
     articles = search_results['results']
     logger.info(f"Retrieved {len(articles)} articles from {search_results['source']}")
     
-    # Format articles for the prompt
+    # Sanitize and format articles for the prompt
     articles_text = "\n\n".join([
-        f"Article {i+1}:\nTitle: {article['title']}\nURL: {article['url']}\nDescription: {article['description']}"
+        f"Article {i+1}:\n"
+        f"Title: {_sanitize_text_for_prompt(article.get('title', ''))}\n"
+        f"URL: {_sanitize_text_for_prompt(article.get('url', ''))}\n"
+        f"Description: {_sanitize_text_for_prompt(article.get('description', ''))}"
         for i, article in enumerate(articles[:10])  # Limit to top 10 to avoid token overflow
     ])
     
     # Create a specialized prompt with real article data
-    prompt = f"""Create a newsletter about {topic} using the following real articles as sources.
-
-Style: {style}
-
-Real Articles to Reference:
-{articles_text}
-
-Please structure your response as follows:
-1. Start with a compelling subject line on the first line (prefix with "Subject: ")
-2. Follow with the newsletter body including:
-   - An engaging introduction
-   - 3-5 interesting segments synthesizing insights from the articles above
-   - Include REAL URLs from the articles provided (not placeholder URLs)
-   - Reference specific articles by title and include their actual URLs
-   - A brief conclusion
-
-IMPORTANT: Use only the real URLs provided above. Do not make up or hallucinate any URLs.
-Keep the tone {style} and make it engaging for readers."""
+    prompt = (
+        f"Create a newsletter about {topic} using the following real articles as sources.\n\n"
+        f"Style: {style}\n\n"
+        f"Real Articles to Reference:\n{articles_text}\n\n"
+        f"Please structure your response as follows:\n"
+        f"1. Start with a compelling subject line on the first line (prefix with \"Subject: \")\n"
+        f"2. Follow with the newsletter body including:\n"
+        f"   - An engaging introduction\n"
+        f"   - 3-5 interesting segments synthesizing insights from the articles above\n"
+        f"   - Include REAL URLs from the articles provided (not placeholder URLs)\n"
+        f"   - Reference specific articles by title and include their actual URLs\n"
+        f"   - A brief conclusion\n\n"
+        f"IMPORTANT: Use only the real URLs provided above. Do not make up or hallucinate any URLs.\n"
+        f"Keep the tone {style} and make it engaging for readers."
+    )
     
     # Use a system prompt to reinforce using real data
-    system_prompt = """You are an expert newsletter writer who synthesizes real articles into 
-compelling newsletters. You MUST use only the real article URLs provided to you - never make up 
-or hallucinate URLs. Always start with a subject line prefixed with "Subject: " on the first line, 
-followed by the newsletter content with real, verified links from the provided articles."""
+    system_prompt = (
+        "You are an expert newsletter writer who synthesizes real articles into "
+        "compelling newsletters. You MUST use only the real article URLs provided to you - never make up "
+        "or hallucinate URLs. Always start with a subject line prefixed with \"Subject: \" on the first line, "
+        "followed by the newsletter content with real, verified links from the provided articles."
+    )
     
     # Generate content
     result = generate_text(

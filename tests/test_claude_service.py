@@ -481,6 +481,77 @@ Stay updated with the latest in machine learning."""
         assert 'Latest AI Developments' in prompt_content
         assert 'https://example.com/ai-developments' in prompt_content
     
+    def test_sanitize_text_for_prompt(self):
+        """Test text sanitization for prompt injection prevention."""
+        # Test basic sanitization
+        result = claude_service._sanitize_text_for_prompt("Normal text")
+        assert result == "Normal text"
+        
+        # Test newline removal
+        result = claude_service._sanitize_text_for_prompt("Text with\nnewlines\r\nhere")
+        assert '\n' not in result
+        assert '\r' not in result
+        assert result == "Text with newlines here"
+        
+        # Test multiple space normalization
+        result = claude_service._sanitize_text_for_prompt("Text   with    spaces")
+        assert result == "Text with spaces"
+        
+        # Test length limiting
+        long_text = "a" * 600
+        result = claude_service._sanitize_text_for_prompt(long_text)
+        assert len(result) <= 503  # 500 + "..."
+        assert result.endswith("...")
+        
+        # Test empty string
+        result = claude_service._sanitize_text_for_prompt("")
+        assert result == ""
+        
+        # Test None handling
+        result = claude_service._sanitize_text_for_prompt(None)
+        assert result == ""
+    
+    @patch('app.claude_service._get_client')
+    @patch('app.services.search_brave')
+    def test_generate_newsletter_with_search_sanitizes_articles(self, mock_search_brave, mock_get_client):
+        """Test that article data is sanitized before being used in prompt."""
+        # Mock search results with potentially malicious content
+        mock_search_results = {
+            'success': True,
+            'source': 'brave',
+            'query': 'test',
+            'results': [
+                {
+                    'title': 'Title with\nnewlines\nhere',
+                    'url': 'https://example.com',
+                    'description': 'Description   with   spaces'
+                }
+            ],
+            'total_results': 1
+        }
+        mock_search_brave.return_value = mock_search_results
+        
+        mock_client = Mock()
+        mock_message = MockMessage("Subject: Test\n\nContent")
+        mock_client.messages.create.return_value = mock_message
+        mock_get_client.return_value = mock_client
+        
+        result = claude_service.generate_newsletter_with_search("test")
+        
+        assert result is not None
+        
+        # Verify prompt was sanitized
+        call_kwargs = mock_client.messages.create.call_args[1]
+        prompt_content = call_kwargs['messages'][0]['content']
+        
+        # Newlines should be removed from title
+        assert 'Title with\nnewlines' not in prompt_content
+        assert 'Title with newlines here' in prompt_content
+        
+        # Multiple spaces should be normalized in description
+        assert 'Description   with   spaces' not in prompt_content
+        assert 'Description with spaces' in prompt_content
+    
     @patch('app.claude_service._get_client')
     @patch('app.services.search_brave')
     def test_generate_newsletter_with_search_custom_count(self, mock_search_brave, mock_get_client):
