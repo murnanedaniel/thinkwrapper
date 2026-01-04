@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """
-Demo script to test SendGrid email integration.
+Demo script to test Mailjet email integration.
 
-This script tests the email sending functionality with a real SendGrid API key.
-Set SENDGRID_API_KEY and SENDGRID_TEST_EMAIL environment variables before running.
+This script tests the email sending functionality with a real Mailjet API.
+Set MAILJET_API_KEY, MAILJET_API_SECRET and MAILJET_TEST_EMAIL environment variables before running.
 
 Usage:
-    export SENDGRID_API_KEY="your-sendgrid-api-key"
-    export SENDGRID_TEST_EMAIL="your-email@example.com"
-    python demo_sendgrid.py
+    export MAILJET_API_KEY="your-mailjet-api-key"
+    export MAILJET_API_SECRET="your-mailjet-api-secret"
+    export MAILJET_TEST_EMAIL="your-email@example.com"
+    python demo_mailjet.py
 """
 
 import os
@@ -22,28 +23,35 @@ from app.email_templates import (
 )
 
 
-def test_sendgrid_integration():
-    """Test SendGrid email delivery with real API."""
+def test_mailjet_integration():
+    """Test Mailjet email delivery with real API."""
     
     # Check environment variables
-    api_key = os.environ.get("SENDGRID_API_KEY")
-    test_email = os.environ.get("SENDGRID_TEST_EMAIL")
+    api_key = os.environ.get("MAILJET_API_KEY")
+    api_secret = os.environ.get("MAILJET_API_SECRET")
+    test_email = os.environ.get("MAILJET_TEST_EMAIL")
     
-    if not api_key or api_key.startswith("SG.your-"):
-        print("❌ Error: SENDGRID_API_KEY not configured")
-        print("   Please set a valid SendGrid API key:")
-        print("   export SENDGRID_API_KEY='your-api-key'")
+    if not api_key:
+        print("❌ Error: MAILJET_API_KEY not configured")
+        print("   Please set a valid Mailjet API key:")
+        print("   export MAILJET_API_KEY='your-api-key'")
+        return False
+    
+    if not api_secret:
+        print("❌ Error: MAILJET_API_SECRET not configured")
+        print("   Please set a valid Mailjet API secret:")
+        print("   export MAILJET_API_SECRET='your-api-secret'")
         return False
     
     if not test_email or test_email == "test@example.com":
-        print("⚠️  Warning: SENDGRID_TEST_EMAIL not set")
+        print("⚠️  Warning: MAILJET_TEST_EMAIL not set")
         print("   Using default: test@example.com")
         print("   Set your email to receive test emails:")
-        print("   export SENDGRID_TEST_EMAIL='your-email@example.com'")
+        print("   export MAILJET_TEST_EMAIL='your-email@example.com'")
         test_email = "test@example.com"
     
     print("=" * 60)
-    print("SendGrid Email Integration Test")
+    print("Mailjet Email Integration Test")
     print("=" * 60)
     print(f"📧 Test email: {test_email}")
     print(f"🔑 API Key: {api_key[:10]}..." if len(api_key) > 10 else "🔑 API Key: [hidden]")
@@ -58,7 +66,7 @@ def test_sendgrid_integration():
         html_content = get_test_template()
         result = send_email(
             test_email,
-            "Test Email - SendGrid Integration",
+            "Test Email - Mailjet Integration",
             html_content
         )
         
@@ -129,7 +137,7 @@ def test_sendgrid_integration():
 def main():
     """Main function."""
     try:
-        success = test_sendgrid_integration()
+        success = test_mailjet_integration()
         return 0 if success else 1
     except KeyboardInterrupt:
         print("\n\n⚠️  Test interrupted by user")

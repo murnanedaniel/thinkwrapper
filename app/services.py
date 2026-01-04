@@ -1,8 +1,7 @@
 import os
 import logging
 from openai import OpenAI, APIError, APIConnectionError, RateLimitError
-import sendgrid
-from sendgrid.helpers.mail import Mail, From, To, Content
+from mailjet_rest import Client
 import requests
 from datetime import datetime, timezone
 
@@ -86,7 +85,7 @@ def generate_newsletter_content(topic, style="concise"):
 
 def send_email(to_email, subject, content):
     """
-    Send email using SendGrid
+    Send email using Mailjet
 
     Args:
         to_email (str): Recipient email
@@ -96,27 +95,40 @@ def send_email(to_email, subject, content):
     Returns:
         bool: Success status
     """
-    sg_api_key = os.environ.get("SENDGRID_API_KEY")
-    if not sg_api_key:
-        logger.error("SendGrid API key not configured")
+    mailjet_api_key = os.environ.get("MAILJET_API_KEY")
+    mailjet_api_secret = os.environ.get("MAILJET_API_SECRET")
+    
+    if not mailjet_api_key:
+        logger.error("Mailjet API key not configured")
+        return False
+    
+    if not mailjet_api_secret:
+        logger.error("Mailjet API secret not configured")
         return False
 
     try:
-        sg = sendgrid.SendGridAPIClient(api_key=sg_api_key)
-        from_email_obj = From(DEFAULT_FROM_EMAIL)
-        to_email_obj = To(to_email)
-        content_obj = Content("text/html", content)
-
-        # Use keyword arguments for clarity and correctness
-        mail = Mail(
-            from_email=from_email_obj,
-            to_emails=to_email_obj,
-            subject=subject,
-            html_content=content_obj,
-        )
-
-        response = sg.client.mail.send.post(request_body=mail.get())
-        return response.status_code in [200, 202]
+        mailjet = Client(auth=(mailjet_api_key, mailjet_api_secret), version='v3.1')
+        
+        data = {
+            'Messages': [
+                {
+                    "From": {
+                        "Email": DEFAULT_FROM_EMAIL,
+                        "Name": "ThinkWrapper"
+                    },
+                    "To": [
+                        {
+                            "Email": to_email
+                        }
+                    ],
+                    "Subject": subject,
+                    "HTMLPart": content
+                }
+            ]
+        }
+        
+        result = mailjet.send.create(data=data)
+        return result.status_code in [200, 201]
     except Exception as e:
         logger.error(f"Email sending error: {str(e)}")
         return False

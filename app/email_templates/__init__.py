@@ -157,12 +157,12 @@ def get_test_template() -> str:
     """
     content = """
         <h2>Test Email</h2>
-        <p>This is a test email to verify SendGrid integration.</p>
-        <p>If you received this email, the SendGrid API is configured correctly.</p>
+        <p>This is a test email to verify Mailjet integration.</p>
+        <p>If you received this email, the Mailjet API is configured correctly.</p>
     """
     
     return get_newsletter_template(
-        subject="Test Email - SendGrid Integration",
+        subject="Test Email - Mailjet Integration",
         content=content,
-        preheader="Testing SendGrid email delivery"
+        preheader="Testing Mailjet email delivery"
     )

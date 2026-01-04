@@ -1,8 +1,8 @@
 """
-Integration tests for SendGrid email functionality.
+Integration tests for Mailjet email functionality.
 
-These tests verify email sending with both mocked and real SendGrid API.
-The real API tests require SENDGRID_API_KEY environment variable.
+These tests verify email sending with both mocked and real Mailjet API.
+The real API tests require MAILJET_API_KEY and MAILJET_API_SECRET environment variables.
 """
 
 import os
@@ -67,46 +67,50 @@ class TestEmailTemplates:
         html = get_test_template()
         
         assert "Test Email" in html
-        assert "SendGrid integration" in html
+        assert "Mailjet integration" in html
         assert "<!DOCTYPE html>" in html
 
 
 class TestEmailIntegration:
-    """Integration tests for email sending with SendGrid."""
+    """Integration tests for email sending with Mailjet."""
     
-    @patch("app.services.sendgrid.SendGridAPIClient")
-    @patch.dict(os.environ, {"SENDGRID_API_KEY": "test-api-key"})
-    def test_send_email_with_template(self, mock_sendgrid_client, app_context):
+    @patch("app.services.Client")
+    @patch.dict(os.environ, {"MAILJET_API_KEY": "test-api-key", "MAILJET_API_SECRET": "test-api-secret"})
+    def test_send_email_with_template(self, mock_mailjet_client, app_context):
         """Test sending email with HTML template."""
-        # Mock SendGrid client
+        # Mock Mailjet client
         mock_client = Mock()
         mock_response = Mock()
-        mock_response.status_code = 202
-        mock_client.client.mail.send.post.return_value = mock_response
-        mock_sendgrid_client.return_value = mock_client
+        mock_response.status_code = 200
+        mock_send = Mock()
+        mock_send.create = Mock(return_value=mock_response)
+        mock_client.send = mock_send
+        mock_mailjet_client.return_value = mock_client
         
         # Use email template
         html_content = get_test_template()
         
         result = services.send_email(
             "test@example.com",
-            "Test Email - SendGrid Integration",
+            "Test Email - Mailjet Integration",
             html_content
         )
         
         assert result is True
-        mock_sendgrid_client.assert_called_once_with(api_key="test-api-key")
-        mock_client.client.mail.send.post.assert_called_once()
+        mock_mailjet_client.assert_called_once()
+        mock_send.create.assert_called_once()
     
-    @patch("app.services.sendgrid.SendGridAPIClient")
-    @patch.dict(os.environ, {"SENDGRID_API_KEY": "test-api-key"})
-    def test_send_welcome_email(self, mock_sendgrid_client, app_context):
+    @patch("app.services.Client")
+    @patch.dict(os.environ, {"MAILJET_API_KEY": "test-api-key", "MAILJET_API_SECRET": "test-api-secret"})
+    def test_send_welcome_email(self, mock_mailjet_client, app_context):
         """Test sending welcome email with template."""
         mock_client = Mock()
         mock_response = Mock()
-        mock_response.status_code = 202
-        mock_client.client.mail.send.post.return_value = mock_response
-        mock_sendgrid_client.return_value = mock_client
+        mock_response.status_code = 201
+        mock_send = Mock()
+        mock_send.create = Mock(return_value=mock_response)
+        mock_client.send = mock_send
+        mock_mailjet_client.return_value = mock_client
         
         html_content = get_welcome_template("Jane Doe")
         
@@ -119,15 +123,17 @@ class TestEmailIntegration:
         assert result is True
         assert "Jane Doe" in html_content
     
-    @patch("app.services.sendgrid.SendGridAPIClient")
-    @patch.dict(os.environ, {"SENDGRID_API_KEY": "test-api-key"})
-    def test_send_newsletter_email(self, mock_sendgrid_client, app_context):
+    @patch("app.services.Client")
+    @patch.dict(os.environ, {"MAILJET_API_KEY": "test-api-key", "MAILJET_API_SECRET": "test-api-secret"})
+    def test_send_newsletter_email(self, mock_mailjet_client, app_context):
         """Test sending newsletter with custom template."""
         mock_client = Mock()
         mock_response = Mock()
-        mock_response.status_code = 202
-        mock_client.client.mail.send.post.return_value = mock_response
-        mock_sendgrid_client.return_value = mock_client
+        mock_response.status_code = 200
+        mock_send = Mock()
+        mock_send.create = Mock(return_value=mock_response)
+        mock_client.send = mock_send
+        mock_mailjet_client.return_value = mock_client
         
         newsletter_content = """
             <h2>AI Weekly Update</h2>
@@ -147,15 +153,17 @@ class TestEmailIntegration:
         
         assert result is True
     
-    @patch("app.services.sendgrid.SendGridAPIClient")
-    @patch.dict(os.environ, {"SENDGRID_API_KEY": "test-api-key"})
-    def test_email_failure_handling(self, mock_sendgrid_client, app_context):
+    @patch("app.services.Client")
+    @patch.dict(os.environ, {"MAILJET_API_KEY": "test-api-key", "MAILJET_API_SECRET": "test-api-secret"})
+    def test_email_failure_handling(self, mock_mailjet_client, app_context):
         """Test handling of email send failures."""
         mock_client = Mock()
         mock_response = Mock()
         mock_response.status_code = 400  # Bad request
-        mock_client.client.mail.send.post.return_value = mock_response
-        mock_sendgrid_client.return_value = mock_client
+        mock_send = Mock()
+        mock_send.create = Mock(return_value=mock_response)
+        mock_client.send = mock_send
+        mock_mailjet_client.return_value = mock_client
         
         html_content = get_test_template()
         
@@ -167,13 +175,15 @@ class TestEmailIntegration:
         
         assert result is False
     
-    @patch("app.services.sendgrid.SendGridAPIClient")
-    @patch.dict(os.environ, {"SENDGRID_API_KEY": "test-api-key"})
-    def test_email_network_error_handling(self, mock_sendgrid_client, app_context):
+    @patch("app.services.Client")
+    @patch.dict(os.environ, {"MAILJET_API_KEY": "test-api-key", "MAILJET_API_SECRET": "test-api-secret"})
+    def test_email_network_error_handling(self, mock_mailjet_client, app_context):
         """Test handling of network errors during email send."""
         mock_client = Mock()
-        mock_client.client.mail.send.post.side_effect = Exception("Network error")
-        mock_sendgrid_client.return_value = mock_client
+        mock_send = Mock()
+        mock_send.create = Mock(side_effect=Exception("Network error"))
+        mock_client.send = mock_send
+        mock_mailjet_client.return_value = mock_client
         
         html_content = get_test_template()
         
@@ -198,15 +208,30 @@ class TestEmailIntegration:
         
         assert result is False
     
-    @patch("app.services.sendgrid.SendGridAPIClient")
-    @patch.dict(os.environ, {"SENDGRID_API_KEY": "test-api-key"})
-    def test_email_rate_limit_handling(self, mock_sendgrid_client, app_context):
+    @patch.dict(os.environ, {"MAILJET_API_KEY": "test-key"}, clear=True)
+    def test_email_missing_api_secret(self, app_context):
+        """Test email send fails gracefully when API secret is missing."""
+        html_content = get_test_template()
+        
+        result = services.send_email(
+            "test@example.com",
+            "Test Subject",
+            html_content
+        )
+        
+        assert result is False
+    
+    @patch("app.services.Client")
+    @patch.dict(os.environ, {"MAILJET_API_KEY": "test-api-key", "MAILJET_API_SECRET": "test-api-secret"})
+    def test_email_rate_limit_handling(self, mock_mailjet_client, app_context):
         """Test handling of rate limit errors."""
         mock_client = Mock()
         mock_response = Mock()
         mock_response.status_code = 429  # Rate limit
-        mock_client.client.mail.send.post.return_value = mock_response
-        mock_sendgrid_client.return_value = mock_client
+        mock_send = Mock()
+        mock_send.create = Mock(return_value=mock_response)
+        mock_client.send = mock_send
+        mock_mailjet_client.return_value = mock_client
         
         html_content = get_test_template()
         
@@ -218,15 +243,17 @@ class TestEmailIntegration:
         
         assert result is False
     
-    @patch("app.services.sendgrid.SendGridAPIClient")
-    @patch.dict(os.environ, {"SENDGRID_API_KEY": "test-api-key"})
-    def test_email_server_error_handling(self, mock_sendgrid_client, app_context):
+    @patch("app.services.Client")
+    @patch.dict(os.environ, {"MAILJET_API_KEY": "test-api-key", "MAILJET_API_SECRET": "test-api-secret"})
+    def test_email_server_error_handling(self, mock_mailjet_client, app_context):
         """Test handling of server errors."""
         mock_client = Mock()
         mock_response = Mock()
         mock_response.status_code = 500  # Internal server error
-        mock_client.client.mail.send.post.return_value = mock_response
-        mock_sendgrid_client.return_value = mock_client
+        mock_send = Mock()
+        mock_send.create = Mock(return_value=mock_response)
+        mock_client.send = mock_send
+        mock_mailjet_client.return_value = mock_client
         
         html_content = get_test_template()
         
@@ -240,27 +267,27 @@ class TestEmailIntegration:
 
 
 class TestEmailE2E:
-    """End-to-end tests with real SendGrid API (requires API key)."""
+    """End-to-end tests with real Mailjet API (requires API key and secret)."""
     
     @pytest.mark.skipif(
-        not os.environ.get("SENDGRID_API_KEY") or 
-        os.environ.get("SENDGRID_API_KEY").startswith("SG.your-"),
-        reason="Real SENDGRID_API_KEY not configured"
+        not os.environ.get("MAILJET_API_KEY") or 
+        not os.environ.get("MAILJET_API_SECRET"),
+        reason="Real MAILJET_API_KEY and MAILJET_API_SECRET not configured"
     )
     def test_send_real_email(self, app_context):
         """
-        Test sending email with real SendGrid API.
+        Test sending email with real Mailjet API.
         
-        This test is skipped unless a real SENDGRID_API_KEY is set.
-        Set SENDGRID_TEST_EMAIL environment variable to your test email address.
+        This test is skipped unless real MAILJET_API_KEY and MAILJET_API_SECRET are set.
+        Set MAILJET_TEST_EMAIL environment variable to your test email address.
         """
-        test_email = os.environ.get("SENDGRID_TEST_EMAIL", "test@example.com")
+        test_email = os.environ.get("MAILJET_TEST_EMAIL", "test@example.com")
         
         html_content = get_test_template()
         
         result = services.send_email(
             test_email,
-            "Test Email - SendGrid Integration",
+            "Test Email - Mailjet Integration",
             html_content
         )
         
@@ -268,13 +295,13 @@ class TestEmailE2E:
         assert result is True
     
     @pytest.mark.skipif(
-        not os.environ.get("SENDGRID_API_KEY") or 
-        os.environ.get("SENDGRID_API_KEY").startswith("SG.your-"),
-        reason="Real SENDGRID_API_KEY not configured"
+        not os.environ.get("MAILJET_API_KEY") or 
+        not os.environ.get("MAILJET_API_SECRET"),
+        reason="Real MAILJET_API_KEY and MAILJET_API_SECRET not configured"
     )
     def test_send_welcome_email_real(self, app_context):
         """Test sending welcome email with real API."""
-        test_email = os.environ.get("SENDGRID_TEST_EMAIL", "test@example.com")
+        test_email = os.environ.get("MAILJET_TEST_EMAIL", "test@example.com")
         
         html_content = get_welcome_template("Test User")
         
@@ -287,28 +314,28 @@ class TestEmailE2E:
         assert result is True
     
     @pytest.mark.skipif(
-        not os.environ.get("SENDGRID_API_KEY") or 
-        os.environ.get("SENDGRID_API_KEY").startswith("SG.your-"),
-        reason="Real SENDGRID_API_KEY not configured"
+        not os.environ.get("MAILJET_API_KEY") or 
+        not os.environ.get("MAILJET_API_SECRET"),
+        reason="Real MAILJET_API_KEY and MAILJET_API_SECRET not configured"
     )
     def test_send_newsletter_real(self, app_context):
         """Test sending newsletter email with real API."""
-        test_email = os.environ.get("SENDGRID_TEST_EMAIL", "test@example.com")
+        test_email = os.environ.get("MAILJET_TEST_EMAIL", "test@example.com")
         
         newsletter_content = """
             <h2>Test Newsletter</h2>
-            <p>This is a test newsletter to verify the SendGrid integration.</p>
+            <p>This is a test newsletter to verify the Mailjet integration.</p>
             <p>If you received this, everything is working correctly!</p>
         """
         html_content = get_newsletter_template(
             "Test Newsletter",
             newsletter_content,
-            preheader="Testing SendGrid integration"
+            preheader="Testing Mailjet integration"
         )
         
         result = services.send_email(
             test_email,
-            "Test Newsletter - SendGrid Integration",
+            "Test Newsletter - Mailjet Integration",
             html_content
         )
         
