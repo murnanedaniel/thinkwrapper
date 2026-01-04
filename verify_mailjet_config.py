@@ -3,6 +3,10 @@
 Verify Mailjet credentials and configuration.
 
 This script checks that the Mailjet integration is properly configured.
+Set environment variables before running:
+    export MAILJET_API_KEY="your-api-key"
+    export MAILJET_API_SECRET="your-api-secret"
+    export MAILJET_TEST_EMAIL="your-email@example.com"
 """
 
 import os
@@ -20,7 +24,9 @@ def verify_mailjet_config():
     # Check API key
     api_key = os.environ.get("MAILJET_API_KEY")
     if api_key:
-        print(f"✅ MAILJET_API_KEY: {api_key[:10]}...{api_key[-4:]}")
+        # Mask the key for security
+        masked_key = api_key[:10] + "..." + api_key[-4:] if len(api_key) > 14 else "[MASKED]"
+        print(f"✅ MAILJET_API_KEY: {masked_key}")
     else:
         print("❌ MAILJET_API_KEY: Not set")
         return False
@@ -28,7 +34,9 @@ def verify_mailjet_config():
     # Check API secret
     api_secret = os.environ.get("MAILJET_API_SECRET")
     if api_secret:
-        print(f"✅ MAILJET_API_SECRET: {api_secret[:10]}...{api_secret[-4:]}")
+        # Mask the secret for security
+        masked_secret = api_secret[:10] + "..." + api_secret[-4:] if len(api_secret) > 14 else "[MASKED]"
+        print(f"✅ MAILJET_API_SECRET: {masked_secret}")
     else:
         print("❌ MAILJET_API_SECRET: Not set")
         return False
@@ -42,9 +50,7 @@ def verify_mailjet_config():
     print("Configuration Status: ✅ COMPLETE")
     print("=" * 60)
     print()
-    print("The Mailjet integration is properly configured with:")
-    print(f"  - API Key: {api_key}")
-    print(f"  - API Secret: {api_secret}")
+    print("The Mailjet integration is properly configured.")
     print()
     print("To test email delivery:")
     print("  1. Ensure network access to api.mailjet.com")
@@ -56,10 +62,5 @@ def verify_mailjet_config():
 
 
 if __name__ == "__main__":
-    # Set credentials for verification
-    os.environ["MAILJET_API_KEY"] = "3a0aba3dd802667d3416f9570fbdf423"
-    os.environ["MAILJET_API_SECRET"] = "a6c8c2915d3e0bab03cb6b8aac877ed9"
-    os.environ["MAILJET_TEST_EMAIL"] = "test@example.com"
-    
     success = verify_mailjet_config()
     sys.exit(0 if success else 1)
