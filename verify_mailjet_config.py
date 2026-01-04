@@ -25,7 +25,10 @@ def verify_mailjet_config():
     api_key = os.environ.get("MAILJET_API_KEY")
     if api_key:
         # Mask the key for security - show only first 4 and last 4 characters
-        masked_key = api_key[:4] + "..." + api_key[-4:] if len(api_key) > 8 else "[MASKED]"
+        if len(api_key) >= 8:
+            masked_key = api_key[:4] + "..." + api_key[-4:]
+        else:
+            masked_key = "[MASKED]"
         print(f"✅ MAILJET_API_KEY: {masked_key}")
     else:
         print("❌ MAILJET_API_KEY: Not set")
@@ -35,7 +38,10 @@ def verify_mailjet_config():
     api_secret = os.environ.get("MAILJET_API_SECRET")
     if api_secret:
         # Mask the secret for security - show only first 4 and last 4 characters
-        masked_secret = api_secret[:4] + "..." + api_secret[-4:] if len(api_secret) > 8 else "[MASKED]"
+        if len(api_secret) >= 8:
+            masked_secret = api_secret[:4] + "..." + api_secret[-4:]
+        else:
+            masked_secret = "[MASKED]"
         print(f"✅ MAILJET_API_SECRET: {masked_secret}")
     else:
         print("❌ MAILJET_API_SECRET: Not set")
@@ -46,7 +52,12 @@ def verify_mailjet_config():
     # Mask email for security
     if test_email != "Not set" and "@" in test_email:
         email_parts = test_email.split("@")
-        masked_email = email_parts[0][:2] + "***@" + email_parts[1]
+        username = email_parts[0]
+        if len(username) > 2:
+            masked_username = username[:1] + "***" + username[-1:]
+        else:
+            masked_username = "***"
+        masked_email = masked_username + "@" + email_parts[1]
         print(f"📧 MAILJET_TEST_EMAIL: {masked_email}")
     else:
         print(f"📧 MAILJET_TEST_EMAIL: {test_email}")
