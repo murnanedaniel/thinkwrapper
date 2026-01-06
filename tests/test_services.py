@@ -88,52 +88,58 @@ class TestNewsletterGeneration:
 
 
 class TestEmailService:
-    """Test email sending functionality using SendGrid."""
+    """Test email sending functionality using Mailjet."""
 
-    @patch("app.services.sendgrid.SendGridAPIClient")
-    @patch.dict(os.environ, {"SENDGRID_API_KEY": "test-api-key"})
-    def test_send_email_success(self, mock_sendgrid_client, app_context):
+    @patch("app.services.Client")
+    @patch.dict(os.environ, {"MAILJET_API_KEY": "test-api-key", "MAILJET_API_SECRET": "test-api-secret"})
+    def test_send_email_success(self, mock_mailjet_client, app_context):
         """Test successful email sending."""
-        # Mock SendGrid client
+        # Mock Mailjet client
         mock_client = Mock()
         mock_response = Mock()
-        mock_response.status_code = 202
-        mock_client.client.mail.send.post.return_value = mock_response
-        mock_sendgrid_client.return_value = mock_client
+        mock_response.status_code = 201
+        mock_send = Mock()
+        mock_send.create = Mock(return_value=mock_response)
+        mock_client.send = mock_send
+        mock_mailjet_client.return_value = mock_client
 
         result = services.send_email(
             "test@example.com", "Test Subject", "<h1>Test Content</h1>"
         )
 
         assert result is True
-        mock_sendgrid_client.assert_called_once_with(api_key="test-api-key")
-        mock_client.client.mail.send.post.assert_called_once()
+        mock_mailjet_client.assert_called_once()
+        mock_send.create.assert_called_once()
 
-    @patch("app.services.sendgrid.SendGridAPIClient")
-    @patch.dict(os.environ, {"SENDGRID_API_KEY": "test-api-key"})
+    @patch("app.services.Client")
+    @patch.dict(os.environ, {"MAILJET_API_KEY": "test-api-key", "MAILJET_API_SECRET": "test-api-secret"})
     def test_send_email_success_with_200_status(
-        self, mock_sendgrid_client, app_context
+        self, mock_mailjet_client, app_context
     ):
         """Test successful email sending with 200 status code."""
         mock_client = Mock()
         mock_response = Mock()
         mock_response.status_code = 200  # Alternative success status
-        mock_client.client.mail.send.post.return_value = mock_response
-        mock_sendgrid_client.return_value = mock_client
+        mock_send = Mock()
+        mock_send.create = Mock(return_value=mock_response)
+        mock_client.send = mock_send
+        mock_mailjet_client.return_value = mock_client
 
         result = services.send_email("test@example.com", "Test Subject", "Test Content")
 
         assert result is True
 
-    @patch("app.services.sendgrid.SendGridAPIClient")
-    @patch.dict(os.environ, {"SENDGRID_API_KEY": "test-api-key"})
-    def test_send_email_failure_status(self, mock_sendgrid_client, app_context):
+    @patch("app.services.Client")
+    @patch.dict(os.environ, {"MAILJET_API_KEY": "test-api-key", "MAILJET_API_SECRET": "test-api-secret"})
+    def test_send_email_failure_status(self, mock_mailjet_client, app_context):
         """Test email sending with failure status code."""
         mock_client = Mock()
         mock_response = Mock()
         mock_response.status_code = 400  # Error status
-        mock_client.client.mail.send.post.return_value = mock_response
-        mock_sendgrid_client.return_value = mock_client
+        mock_send = Mock()
+        mock_send.create = Mock(return_value=mock_response)
+        mock_client.send = mock_send
+        mock_mailjet_client.return_value = mock_client
 
         result = services.send_email("test@example.com", "Test Subject", "Test Content")
 
@@ -146,25 +152,31 @@ class TestEmailService:
 
         assert result is False
 
-    @patch("app.services.sendgrid.SendGridAPIClient")
-    @patch.dict(os.environ, {"SENDGRID_API_KEY": "test-api-key"})
-    def test_send_email_sendgrid_exception(self, mock_sendgrid_client, app_context):
-        """Test handling of SendGrid exceptions."""
-        mock_sendgrid_client.side_effect = Exception("SendGrid connection error")
+    @patch("app.services.Client")
+    @patch.dict(os.environ, {"MAILJET_API_KEY": "test-api-key", "MAILJET_API_SECRET": "test-api-secret"})
+    def test_send_email_mailjet_exception(self, mock_mailjet_client, app_context):
+        """Test handling of Mailjet exceptions."""
+        mock_client = Mock()
+        mock_send = Mock()
+        mock_send.create = Mock(side_effect=Exception("Mailjet connection error"))
+        mock_client.send = mock_send
+        mock_mailjet_client.return_value = mock_client
 
         result = services.send_email("test@example.com", "Test Subject", "Test Content")
 
         assert result is False
 
-    @patch("app.services.sendgrid.SendGridAPIClient")
-    @patch.dict(os.environ, {"SENDGRID_API_KEY": "test-api-key"})
-    def test_send_email_mail_construction(self, mock_sendgrid_client, app_context):
+    @patch("app.services.Client")
+    @patch.dict(os.environ, {"MAILJET_API_KEY": "test-api-key", "MAILJET_API_SECRET": "test-api-secret"})
+    def test_send_email_mail_construction(self, mock_mailjet_client, app_context):
         """Test that email components are properly constructed."""
         mock_client = Mock()
         mock_response = Mock()
-        mock_response.status_code = 202
-        mock_client.client.mail.send.post.return_value = mock_response
-        mock_sendgrid_client.return_value = mock_client
+        mock_response.status_code = 200
+        mock_send = Mock()
+        mock_send.create = Mock(return_value=mock_response)
+        mock_client.send = mock_send
+        mock_mailjet_client.return_value = mock_client
 
         # Test with HTML content
         result = services.send_email(
@@ -175,10 +187,10 @@ class TestEmailService:
 
         assert result is True
 
-        # Verify the mail was sent with proper request body
-        mock_client.client.mail.send.post.assert_called_once()
-        call_args = mock_client.client.mail.send.post.call_args
-        assert "request_body" in call_args[1]
+        # Verify the mail was sent
+        mock_send.create.assert_called_once()
+        call_args = mock_send.create.call_args
+        assert "data" in call_args[1]
 
 
 class TestWebhookVerification:

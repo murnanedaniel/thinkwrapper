@@ -299,3 +299,139 @@ on the first line, followed by the newsletter content."""
         'model': result['model'],
         'usage': result['usage']
     }
+
+
+def _sanitize_text_for_prompt(text: str) -> str:
+    """
+    Sanitize text from external sources to prevent prompt injection.
+    
+    Args:
+        text: Text to sanitize
+        
+    Returns:
+        Sanitized text safe for use in prompts
+    """
+    if not text:
+        return ""
+    
+    # Remove or escape potentially problematic characters/sequences
+    # Replace newlines with spaces to prevent prompt structure manipulation
+    sanitized = text.replace('\n', ' ').replace('\r', ' ')
+    
+    # Remove multiple spaces
+    sanitized = ' '.join(sanitized.split())
+    
+    # Limit length to prevent token overflow from malicious input
+    max_length = 500
+    if len(sanitized) > max_length:
+        sanitized = sanitized[:max_length] + "..."
+    
+    return sanitized
+
+
+def generate_newsletter_with_search(
+    topic: str,
+    style: str = "professional",
+    max_tokens: int = 2000,
+    search_count: int = 10
+) -> Optional[Dict[str, Any]]:
+    """
+    Generate newsletter content using Claude API with real search results from Brave Search.
+    
+    This function integrates Brave Search to get current, real articles and then uses
+    Claude to synthesize them into a compelling newsletter with verified links.
+    
+    Args:
+        topic: The newsletter topic
+        style: The writing style
+        max_tokens: Maximum tokens for the response
+        search_count: Number of search results to fetch from Brave Search
+        
+    Returns:
+        Dictionary with 'subject', 'content', 'articles', and metadata, or None on error
+        
+    Examples:
+        >>> newsletter = generate_newsletter_with_search("AI trends", "technical")
+        >>> print(newsletter['subject'])
+        >>> print(newsletter['content'])
+        >>> print(newsletter['articles'])  # List of real articles used
+    """
+    from .services import search_brave
+    
+    # Get real search results from Brave Search
+    logger.info(f"Searching Brave for topic: {topic}")
+    search_results = search_brave(query=topic, count=search_count, fallback_to_mock=True)
+    
+    if not search_results.get('success') or not search_results.get('results'):
+        logger.error(f"Failed to get search results for topic: {topic}")
+        return None
+    
+    articles = search_results['results']
+    logger.info(f"Retrieved {len(articles)} articles from {search_results['source']}")
+    
+    # Sanitize and format articles for the prompt
+    articles_text = "\n\n".join([
+        f"Article {i+1}:\n"
+        f"Title: {_sanitize_text_for_prompt(article.get('title', ''))}\n"
+        f"URL: {_sanitize_text_for_prompt(article.get('url', ''))}\n"
+        f"Description: {_sanitize_text_for_prompt(article.get('description', ''))}"
+        for i, article in enumerate(articles[:10])  # Limit to top 10 to avoid token overflow
+    ])
+    
+    # Create a specialized prompt with real article data
+    prompt = (
+        f"Create a newsletter about {topic} using the following real articles as sources.\n\n"
+        f"Style: {style}\n\n"
+        f"Real Articles to Reference:\n{articles_text}\n\n"
+        f"Please structure your response as follows:\n"
+        f"1. Start with a compelling subject line on the first line (prefix with \"Subject: \")\n"
+        f"2. Follow with the newsletter body including:\n"
+        f"   - An engaging introduction\n"
+        f"   - 3-5 interesting segments synthesizing insights from the articles above\n"
+        f"   - Include REAL URLs from the articles provided (not placeholder URLs)\n"
+        f"   - Reference specific articles by title and include their actual URLs\n"
+        f"   - A brief conclusion\n\n"
+        f"IMPORTANT: Use only the real URLs provided above. Do not make up or hallucinate any URLs.\n"
+        f"Keep the tone {style} and make it engaging for readers."
+    )
+    
+    # Use a system prompt to reinforce using real data
+    system_prompt = (
+        "You are an expert newsletter writer who synthesizes real articles into "
+        "compelling newsletters. You MUST use only the real article URLs provided to you - never make up "
+        "or hallucinate URLs. Always start with a subject line prefixed with \"Subject: \" on the first line, "
+        "followed by the newsletter content with real, verified links from the provided articles."
+    )
+    
+    # Generate content
+    result = generate_text(
+        prompt=prompt,
+        max_tokens=max_tokens,
+        temperature=0.7,
+        system_prompt=system_prompt
+    )
+    
+    if not result:
+        return None
+    
+    # Parse the response to extract subject and body
+    content = result['text'].strip()
+    lines = content.split('\n', 1)
+    
+    # Extract subject line
+    subject = lines[0]
+    if subject.lower().startswith('subject:'):
+        subject = subject[8:].strip()
+    
+    # Extract body (everything after the first line)
+    body = lines[1].strip() if len(lines) > 1 else ""
+    
+    return {
+        'subject': subject,
+        'content': body,
+        'articles': articles,
+        'search_source': search_results['source'],
+        'total_articles': len(articles),
+        'model': result['model'],
+        'usage': result['usage']
+    }

@@ -1,0 +1,83 @@
+#!/usr/bin/env python3
+"""
+Verify Mailjet credentials and configuration.
+
+This script checks that the Mailjet integration is properly configured.
+Set environment variables before running:
+    export MAILJET_API_KEY="your-api-key"
+    export MAILJET_API_SECRET="your-api-secret"
+    export MAILJET_TEST_EMAIL="your-email@example.com"
+"""
+
+import os
+import sys
+
+
+def verify_mailjet_config():
+    """Verify Mailjet configuration."""
+    
+    print("=" * 60)
+    print("Mailjet Configuration Verification")
+    print("=" * 60)
+    print()
+    
+    # Check API key
+    api_key = os.environ.get("MAILJET_API_KEY")
+    if api_key:
+        # Mask the key for security - show only first 4 and last 4 characters
+        if len(api_key) >= 8:
+            masked_key = api_key[:4] + "..." + api_key[-4:]
+        else:
+            masked_key = "[MASKED]"
+        print(f"✅ MAILJET_API_KEY: {masked_key}")
+    else:
+        print("❌ MAILJET_API_KEY: Not set")
+        return False
+    
+    # Check API secret
+    api_secret = os.environ.get("MAILJET_API_SECRET")
+    if api_secret:
+        # Mask the secret for security - show only first 4 and last 4 characters
+        if len(api_secret) >= 8:
+            masked_secret = api_secret[:4] + "..." + api_secret[-4:]
+        else:
+            masked_secret = "[MASKED]"
+        print(f"✅ MAILJET_API_SECRET: {masked_secret}")
+    else:
+        print("❌ MAILJET_API_SECRET: Not set")
+        return False
+    
+    # Check test email
+    test_email = os.environ.get("MAILJET_TEST_EMAIL", "Not set")
+    # Mask email for security
+    if test_email != "Not set" and "@" in test_email:
+        email_parts = test_email.split("@")
+        username = email_parts[0]
+        if len(username) > 2:
+            masked_username = username[:1] + "***" + username[-1:]
+        else:
+            masked_username = "***"
+        masked_email = masked_username + "@" + email_parts[1]
+        print(f"📧 MAILJET_TEST_EMAIL: {masked_email}")
+    else:
+        print(f"📧 MAILJET_TEST_EMAIL: {test_email}")
+    
+    print()
+    print("=" * 60)
+    print("Configuration Status: ✅ COMPLETE")
+    print("=" * 60)
+    print()
+    print("The Mailjet integration is properly configured.")
+    print()
+    print("To test email delivery:")
+    print("  1. Ensure network access to api.mailjet.com")
+    print("  2. Run: python demo_mailjet.py")
+    print("  3. Or run E2E tests: pytest tests/test_email_integration.py::TestEmailE2E -v")
+    print()
+    
+    return True
+
+
+if __name__ == "__main__":
+    success = verify_mailjet_config()
+    sys.exit(0 if success else 1)

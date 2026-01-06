@@ -408,3 +408,286 @@ class TestAPIKeyConfiguration:
         """Test getting async client without API key."""
         client = claude_service._get_async_client()
         assert client is None
+
+
+class TestNewsletterWithSearch:
+    """Test newsletter generation with Brave Search integration."""
+    
+    @patch('app.claude_service._get_client')
+    @patch('app.services.search_brave')
+    def test_generate_newsletter_with_search_success(self, mock_search_brave, mock_get_client):
+        """Test successful newsletter generation with real search results."""
+        # Mock search results
+        mock_search_results = {
+            'success': True,
+            'source': 'brave',
+            'query': 'AI trends',
+            'results': [
+                {
+                    'title': 'Latest AI Developments',
+                    'url': 'https://example.com/ai-developments',
+                    'description': 'Recent breakthroughs in artificial intelligence'
+                },
+                {
+                    'title': 'Machine Learning News',
+                    'url': 'https://example.com/ml-news',
+                    'description': 'Latest updates in machine learning'
+                }
+            ],
+            'total_results': 2
+        }
+        mock_search_brave.return_value = mock_search_results
+        
+        # Mock Claude response with real URLs
+        mock_client = Mock()
+        content = """Subject: AI Trends Weekly Update
+
+Check out these fascinating articles:
+
+1. Latest AI Developments - https://example.com/ai-developments
+Recent breakthroughs in artificial intelligence are changing the landscape.
+
+2. Machine Learning News - https://example.com/ml-news
+Stay updated with the latest in machine learning."""
+        mock_message = MockMessage(content)
+        mock_client.messages.create.return_value = mock_message
+        mock_get_client.return_value = mock_client
+        
+        result = claude_service.generate_newsletter_with_search("AI trends")
+        
+        assert result is not None
+        assert 'subject' in result
+        assert 'content' in result
+        assert 'articles' in result
+        assert 'search_source' in result
+        assert 'total_articles' in result
+        
+        # Verify real URLs are in the content
+        assert 'https://example.com/ai-developments' in result['content']
+        assert 'https://example.com/ml-news' in result['content']
+        
+        # Verify articles are included
+        assert len(result['articles']) == 2
+        assert result['articles'][0]['url'] == 'https://example.com/ai-developments'
+        assert result['search_source'] == 'brave'
+        assert result['total_articles'] == 2
+        
+        # Verify search was called
+        mock_search_brave.assert_called_once_with(query='AI trends', count=10, fallback_to_mock=True)
+        
+        # Verify Claude was called with article data in prompt
+        call_kwargs = mock_client.messages.create.call_args[1]
+        prompt_content = call_kwargs['messages'][0]['content']
+        assert 'Latest AI Developments' in prompt_content
+        assert 'https://example.com/ai-developments' in prompt_content
+    
+    def test_sanitize_text_for_prompt(self):
+        """Test text sanitization for prompt injection prevention."""
+        # Test basic sanitization
+        result = claude_service._sanitize_text_for_prompt("Normal text")
+        assert result == "Normal text"
+        
+        # Test newline removal
+        result = claude_service._sanitize_text_for_prompt("Text with\nnewlines\r\nhere")
+        assert '\n' not in result
+        assert '\r' not in result
+        assert result == "Text with newlines here"
+        
+        # Test multiple space normalization
+        result = claude_service._sanitize_text_for_prompt("Text   with    spaces")
+        assert result == "Text with spaces"
+        
+        # Test length limiting
+        long_text = "a" * 600
+        result = claude_service._sanitize_text_for_prompt(long_text)
+        assert len(result) <= 503  # 500 + "..."
+        assert result.endswith("...")
+        
+        # Test empty string
+        result = claude_service._sanitize_text_for_prompt("")
+        assert result == ""
+        
+        # Test None handling
+        result = claude_service._sanitize_text_for_prompt(None)
+        assert result == ""
+    
+    @patch('app.claude_service._get_client')
+    @patch('app.services.search_brave')
+    def test_generate_newsletter_with_search_sanitizes_articles(self, mock_search_brave, mock_get_client):
+        """Test that article data is sanitized before being used in prompt."""
+        # Mock search results with potentially malicious content
+        mock_search_results = {
+            'success': True,
+            'source': 'brave',
+            'query': 'test',
+            'results': [
+                {
+                    'title': 'Title with\nnewlines\nhere',
+                    'url': 'https://example.com',
+                    'description': 'Description   with   spaces'
+                }
+            ],
+            'total_results': 1
+        }
+        mock_search_brave.return_value = mock_search_results
+        
+        mock_client = Mock()
+        mock_message = MockMessage("Subject: Test\n\nContent")
+        mock_client.messages.create.return_value = mock_message
+        mock_get_client.return_value = mock_client
+        
+        result = claude_service.generate_newsletter_with_search("test")
+        
+        assert result is not None
+        
+        # Verify prompt was sanitized
+        call_kwargs = mock_client.messages.create.call_args[1]
+        prompt_content = call_kwargs['messages'][0]['content']
+        
+        # Newlines should be removed from title
+        assert 'Title with\nnewlines' not in prompt_content
+        assert 'Title with newlines here' in prompt_content
+        
+        # Multiple spaces should be normalized in description
+        assert 'Description   with   spaces' not in prompt_content
+        assert 'Description with spaces' in prompt_content
+    
+    @patch('app.claude_service._get_client')
+    @patch('app.services.search_brave')
+    def test_generate_newsletter_with_search_custom_count(self, mock_search_brave, mock_get_client):
+        """Test newsletter generation with custom search count."""
+        mock_search_results = {
+            'success': True,
+            'source': 'brave',
+            'results': [{'title': 'Test', 'url': 'https://test.com', 'description': 'Test'}],
+            'total_results': 1
+        }
+        mock_search_brave.return_value = mock_search_results
+        
+        mock_client = Mock()
+        mock_message = MockMessage("Subject: Test\n\nContent with https://test.com")
+        mock_client.messages.create.return_value = mock_message
+        mock_get_client.return_value = mock_client
+        
+        result = claude_service.generate_newsletter_with_search("Topic", search_count=5)
+        
+        assert result is not None
+        mock_search_brave.assert_called_once_with(query='Topic', count=5, fallback_to_mock=True)
+    
+    @patch('app.claude_service._get_client')
+    @patch('app.services.search_brave')
+    def test_generate_newsletter_with_search_no_results(self, mock_search_brave, mock_get_client):
+        """Test newsletter generation when search returns no results."""
+        mock_search_results = {
+            'success': False,
+            'source': 'brave',
+            'results': [],
+            'total_results': 0,
+            'error': 'No results found'
+        }
+        mock_search_brave.return_value = mock_search_results
+        
+        result = claude_service.generate_newsletter_with_search("Obscure Topic")
+        
+        assert result is None
+    
+    @patch('app.claude_service._get_client')
+    @patch('app.services.search_brave')
+    def test_generate_newsletter_with_search_mock_fallback(self, mock_search_brave, mock_get_client):
+        """Test newsletter generation with mock search fallback."""
+        mock_search_results = {
+            'success': True,
+            'source': 'mock',
+            'query': 'Test Topic',
+            'results': [
+                {
+                    'title': 'Mock Result 1 for "Test Topic"',
+                    'url': 'https://example.com/result/1',
+                    'description': 'This is a mock search result'
+                }
+            ],
+            'total_results': 1
+        }
+        mock_search_brave.return_value = mock_search_results
+        
+        mock_client = Mock()
+        mock_message = MockMessage("Subject: Test\n\nContent with https://example.com/result/1")
+        mock_client.messages.create.return_value = mock_message
+        mock_get_client.return_value = mock_client
+        
+        result = claude_service.generate_newsletter_with_search("Test Topic")
+        
+        assert result is not None
+        assert result['search_source'] == 'mock'
+        assert 'https://example.com/result/1' in result['content']
+    
+    @patch('app.claude_service._get_client')
+    @patch('app.services.search_brave')
+    def test_generate_newsletter_with_search_no_api_key(self, mock_search_brave, mock_get_client):
+        """Test newsletter generation when Claude API key is not configured."""
+        mock_search_results = {
+            'success': True,
+            'source': 'brave',
+            'results': [{'title': 'Test', 'url': 'https://test.com', 'description': 'Test'}],
+            'total_results': 1
+        }
+        mock_search_brave.return_value = mock_search_results
+        mock_get_client.return_value = None
+        
+        result = claude_service.generate_newsletter_with_search("Topic")
+        
+        assert result is None
+    
+    @patch('app.claude_service._get_client')
+    @patch('app.services.search_brave')
+    def test_generate_newsletter_with_search_includes_style(self, mock_search_brave, mock_get_client):
+        """Test that style parameter is passed to the prompt."""
+        mock_search_results = {
+            'success': True,
+            'source': 'brave',
+            'results': [{'title': 'Test', 'url': 'https://test.com', 'description': 'Test'}],
+            'total_results': 1
+        }
+        mock_search_brave.return_value = mock_search_results
+        
+        mock_client = Mock()
+        mock_message = MockMessage("Subject: Technical Brief\n\nDetailed content")
+        mock_client.messages.create.return_value = mock_message
+        mock_get_client.return_value = mock_client
+        
+        result = claude_service.generate_newsletter_with_search("Topic", style="technical")
+        
+        assert result is not None
+        call_kwargs = mock_client.messages.create.call_args[1]
+        prompt_content = call_kwargs['messages'][0]['content']
+        assert 'technical' in prompt_content
+    
+    @patch('app.claude_service._get_client')
+    @patch('app.services.search_brave')
+    def test_generate_newsletter_with_search_real_urls_only(self, mock_search_brave, mock_get_client):
+        """Test that the prompt emphasizes using only real URLs."""
+        mock_search_results = {
+            'success': True,
+            'source': 'brave',
+            'results': [{'title': 'Test', 'url': 'https://real-url.com', 'description': 'Test'}],
+            'total_results': 1
+        }
+        mock_search_brave.return_value = mock_search_results
+        
+        mock_client = Mock()
+        mock_message = MockMessage("Subject: Test\n\nContent")
+        mock_client.messages.create.return_value = mock_message
+        mock_get_client.return_value = mock_client
+        
+        result = claude_service.generate_newsletter_with_search("Topic")
+        
+        # Verify the prompt emphasizes real URLs
+        call_kwargs = mock_client.messages.create.call_args[1]
+        prompt_content = call_kwargs['messages'][0]['content']
+        assert 'REAL URLs' in prompt_content or 'real URLs' in prompt_content
+        assert 'not placeholder' in prompt_content or 'Do not make up' in prompt_content
+        
+        # Verify system prompt reinforces real URLs
+        system_prompt = call_kwargs.get('system', '')
+        assert 'real' in system_prompt.lower()
+        assert 'never make up' in system_prompt.lower() or 'must use only' in system_prompt.lower()
