@@ -444,11 +444,14 @@ class TestClaudeAPIJourney:
     @patch('app.routes.claude_service')
     def test_claude_newsletter_success(self, mock_claude, client):
         """Test successful Claude newsletter generation."""
-        mock_claude.generate_newsletter_content_claude.return_value = {
+        mock_claude.generate_newsletter_with_search.return_value = {
             'subject': 'AI Newsletter',
             'content': 'Newsletter content here',
             'model': 'claude-haiku-4-5',
-            'usage': {'input_tokens': 50, 'output_tokens': 500}
+            'usage': {'input_tokens': 50, 'output_tokens': 500},
+            'articles': [{'title': 'Test Article', 'url': 'https://example.com', 'description': 'Test'}],
+            'search_source': 'mock',
+            'total_articles': 1
         }
 
         response = client.post('/api/claude/newsletter', json={
