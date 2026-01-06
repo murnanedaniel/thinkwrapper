@@ -66,7 +66,7 @@ def generate_newsletter_async(self, topic, style="concise"):
 @celery.task(base=CallbackTask, bind=True, max_retries=5, default_retry_delay=30)
 def send_email_async(self, to_email, subject, content):
     """
-    Send email asynchronously using SendGrid.
+    Send email asynchronously using Mailjet.
     
     Args:
         to_email (str): Recipient email address
@@ -83,7 +83,7 @@ def send_email_async(self, to_email, subject, content):
         if not success:
             error_msg = (
                 f"Email sending failed for recipient '{to_email}' with subject '{subject}' - "
-                "check SendGrid service configuration, API key validity, and service availability"
+                "check Mailjet service configuration, API key validity, and service availability"
             )
             raise Exception(error_msg)
         
