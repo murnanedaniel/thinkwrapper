@@ -9,6 +9,8 @@ export default defineConfig({
     emptyOutDir: true
   },
   server: {
+    host: '0.0.0.0',  // Listen on all interfaces for WSL2 access
+    port: 5173,
     proxy: {
       '/api': {
         target: 'http://localhost:5000',

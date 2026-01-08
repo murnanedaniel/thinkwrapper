@@ -5,7 +5,8 @@ function CreateNewsletter() {
   const [formData, setFormData] = useState({
     name: '',
     topic: '',
-    schedule: 'weekly'
+    schedule: 'weekly',
+    style: 'professional'
   })
   const [isLoading, setIsLoading] = useState(false)
   const [result, setResult] = useState(null)
@@ -24,7 +25,12 @@ function CreateNewsletter() {
     setError(null)
     
     try {
-      const response = await axios.post('/api/generate', formData)
+      // Create newsletter in database
+      const response = await axios.post('/api/newsletters', {
+        name: formData.name,
+        topic: formData.topic,
+        schedule: formData.schedule
+      })
       setResult(response.data)
     } catch (err) {
       setError(err.response?.data?.error || 'An error occurred')
@@ -35,7 +41,10 @@ function CreateNewsletter() {
 
   return (
     <div className="create-newsletter container">
-      <h1>Create Your Newsletter</h1>
+      <div className="create-header">
+        <h1>Create Your Newsletter</h1>
+        <p className="subtitle">Set up an AI-powered newsletter on any topic</p>
+      </div>
       
       <form onSubmit={handleSubmit} className="newsletter-form">
         <div className="form-group">
@@ -48,6 +57,7 @@ function CreateNewsletter() {
             onChange={handleChange}
             required
             placeholder="My Awesome Newsletter"
+            className="form-input"
           />
         </div>
         
@@ -61,7 +71,9 @@ function CreateNewsletter() {
             onChange={handleChange}
             required
             placeholder="AI, Technology, Finance, etc."
+            className="form-input"
           />
+          <p className="form-hint">Describe what your newsletter should cover</p>
         </div>
         
         <div className="form-group">
@@ -71,6 +83,7 @@ function CreateNewsletter() {
             name="schedule"
             value={formData.schedule}
             onChange={handleChange}
+            className="form-select"
           >
             <option value="daily">Daily</option>
             <option value="weekly">Weekly</option>
@@ -81,10 +94,10 @@ function CreateNewsletter() {
         
         <button 
           type="submit" 
-          className="btn btn-primary"
+          className="btn btn-primary btn-large"
           disabled={isLoading}
         >
-          {isLoading ? 'Generating...' : 'Create Newsletter'}
+          {isLoading ? 'Creating...' : 'Create Newsletter'}
         </button>
       </form>
       

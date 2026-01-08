@@ -6,6 +6,9 @@ from flask import (
     send_from_directory,
 )
 from datetime import datetime
+import os
+import uuid
+import redis
 from .newsletter_synthesis import NewsletterSynthesizer, NewsletterRenderer, NewsletterConfig
 from .services import send_email
 from . import claude_service
@@ -21,6 +24,258 @@ def index():
     return send_from_directory(current_app.static_folder, "index.html")
 
 
+@bp.route("/api/send-newsletter", methods=["POST"])
+@require_json
+def send_newsletter():
+    """Send newsletter email to recipient."""
+    import markdown
+    from app.email_templates import get_newsletter_template
+    
+    data = request.json
+    to_email = InputValidator.sanitize_string(data.get('to_email', ''))
+    subject = data.get('subject', '')
+    content = data.get('content', '')
+    
+    if not to_email or '@' not in to_email:
+        return APIResponse.error("Valid email address required")
+    
+    if not subject or not content:
+        return APIResponse.error("Subject and content are required")
+    
+    # Convert markdown-style content to HTML
+    html_content = markdown.markdown(
+        content,
+        extensions=['nl2br', 'sane_lists']  # Preserve line breaks and better list handling
+    )
+    
+    # Wrap in newsletter template
+    full_html = get_newsletter_template(
+        subject=subject,
+        content=html_content,
+        preheader=subject[:100]  # Use first 100 chars of subject as preheader
+    )
+    
+    # Queue the email task
+    task = send_email_async.delay(
+        to_email,
+        subject,
+        full_html
+    )
+    
+    return APIResponse.processing(
+        task_id=task.id,
+        message=f"Sending newsletter to '{to_email}'"
+    )
+
+
+@bp.route("/api/newsletters", methods=["GET"])
+def get_newsletters():
+    """Get all newsletters for the current user."""
+    from flask_login import current_user
+    from .auth_routes import get_db_session
+    from .models import Newsletter
+    import os
+    
+    db = get_db_session()
+    
+    # In development/testing mode, show all newsletters if not authenticated
+    is_dev_mode = os.getenv('FLASK_ENV') == 'development'
+    
+    if not current_user.is_authenticated:
+        if is_dev_mode:
+            # Show all newsletters from all users for testing
+            newsletters = db.query(Newsletter).all()
+            return jsonify({
+                'success': True,
+                'newsletters': [{
+                    'id': nl.id,
+                    'name': nl.name,
+                    'topic': nl.topic,
+                    'schedule': nl.schedule,
+                    'last_sent_at': nl.last_sent_at.isoformat() if nl.last_sent_at else None,
+                    'created_at': nl.created_at.isoformat() if nl.created_at else None,
+                    'issue_count': len(nl.issues)
+                } for nl in newsletters],
+                'authenticated': False,
+                'dev_mode': True
+            })
+        else:
+            return jsonify({
+                'success': True,
+                'newsletters': [],
+                'authenticated': False
+            })
+    
+    # Authenticated user - show only their newsletters
+    newsletters = db.query(Newsletter).filter_by(user_id=current_user.id).all()
+    
+    return jsonify({
+        'success': True,
+        'authenticated': True,
+        'newsletters': [{
+            'id': nl.id,
+            'name': nl.name,
+            'topic': nl.topic,
+            'schedule': nl.schedule,
+            'last_sent_at': nl.last_sent_at.isoformat() if nl.last_sent_at else None,
+            'created_at': nl.created_at.isoformat() if nl.created_at else None,
+            'issue_count': len(nl.issues)
+        } for nl in newsletters]
+    })
+
+
+@bp.route("/api/newsletters", methods=["POST"])
+@require_json
+def create_newsletter():
+    """Create a new newsletter."""
+    from flask_login import current_user
+    from .auth_routes import get_db_session
+    from .models import Newsletter, User
+    import os
+    
+    is_dev_mode = os.getenv('FLASK_ENV') == 'development'
+    
+    # In dev mode, create newsletters for a test user if not authenticated
+    if not current_user.is_authenticated:
+        if not is_dev_mode:
+            return APIResponse.error("Authentication required", status_code=401)
+        
+        # Get or create a test user
+        db = get_db_session()
+        test_user = db.query(User).filter_by(email='test@thinkwrapper.local').first()
+        if not test_user:
+            test_user = User(
+                email='test@thinkwrapper.local',
+                name='Test User',
+                oauth_provider='local',
+                is_active=True
+            )
+            db.add(test_user)
+            db.commit()
+        user_id = test_user.id
+    else:
+        user_id = current_user.id
+    
+    data = request.json
+    name = InputValidator.sanitize_string(data.get('name', ''))
+    topic = InputValidator.sanitize_string(data.get('topic', ''))
+    schedule = data.get('schedule', 'weekly')
+    
+    # Validate inputs
+    if not name or len(name) < 3:
+        return APIResponse.error("Newsletter name must be at least 3 characters")
+    
+    is_valid, error_msg = InputValidator.validate_topic(topic)
+    if not is_valid:
+        return APIResponse.error(error_msg)
+    
+    # Create newsletter in database
+    db = get_db_session()
+    newsletter = Newsletter(
+        user_id=user_id,
+        name=name,
+        topic=topic,
+        schedule=schedule
+    )
+    db.add(newsletter)
+    db.commit()
+    
+    return jsonify({
+        'success': True,
+        'message': 'Newsletter created successfully',
+        'newsletter': {
+            'id': newsletter.id,
+            'name': newsletter.name,
+            'topic': newsletter.topic,
+            'schedule': newsletter.schedule,
+            'created_at': newsletter.created_at.isoformat()
+        }
+    }), 201
+
+
+@bp.route("/api/newsletters/<int:newsletter_id>", methods=["GET"])
+def get_newsletter(newsletter_id):
+    """Get a specific newsletter by ID."""
+    from flask_login import current_user
+    from .auth_routes import get_db_session
+    from .models import Newsletter
+    import os
+    
+    db = get_db_session()
+    newsletter = db.query(Newsletter).filter_by(id=newsletter_id).first()
+    
+    if not newsletter:
+        return APIResponse.error("Newsletter not found", status_code=404)
+    
+    # Check authorization (unless dev mode)
+    is_dev_mode = os.getenv('FLASK_ENV') == 'development'
+    if not is_dev_mode:
+        if not current_user.is_authenticated or newsletter.user_id != current_user.id:
+            return APIResponse.error("Unauthorized", status_code=403)
+    
+    return jsonify({
+        'success': True,
+        'newsletter': {
+            'id': newsletter.id,
+            'name': newsletter.name,
+            'topic': newsletter.topic,
+            'schedule': newsletter.schedule,
+            'style': 'professional',  # Default for now
+            'last_sent_at': newsletter.last_sent_at.isoformat() if newsletter.last_sent_at else None,
+            'created_at': newsletter.created_at.isoformat() if newsletter.created_at else None,
+            'issue_count': len(newsletter.issues)
+        }
+    })
+
+
+@bp.route("/api/newsletters/<int:newsletter_id>", methods=["PUT"])
+@require_json
+def update_newsletter(newsletter_id):
+    """Update a specific newsletter."""
+    from flask_login import current_user
+    from .auth_routes import get_db_session
+    from .models import Newsletter
+    import os
+    
+    db = get_db_session()
+    newsletter = db.query(Newsletter).filter_by(id=newsletter_id).first()
+    
+    if not newsletter:
+        return APIResponse.error("Newsletter not found", status_code=404)
+    
+    # Check authorization (unless dev mode)
+    is_dev_mode = os.getenv('FLASK_ENV') == 'development'
+    if not is_dev_mode:
+        if not current_user.is_authenticated or newsletter.user_id != current_user.id:
+            return APIResponse.error("Unauthorized", status_code=403)
+    
+    # Update fields
+    data = request.json
+    if 'name' in data:
+        newsletter.name = InputValidator.sanitize_string(data['name'])
+    if 'topic' in data:
+        newsletter.topic = InputValidator.sanitize_string(data['topic'])
+    if 'schedule' in data:
+        schedule = data['schedule']
+        if schedule not in ['daily', 'weekly', 'biweekly', 'monthly']:
+            return APIResponse.error("Invalid schedule")
+        newsletter.schedule = schedule
+    
+    db.commit()
+    
+    return jsonify({
+        'success': True,
+        'message': 'Newsletter updated successfully',
+        'newsletter': {
+            'id': newsletter.id,
+            'name': newsletter.name,
+            'topic': newsletter.topic,
+            'schedule': newsletter.schedule,
+            'updated_at': datetime.now().isoformat()
+        }
+    })
+
+
 @bp.route("/api/generate", methods=["POST"])
 @require_json
 def generate_newsletter():
@@ -28,6 +283,8 @@ def generate_newsletter():
     data = request.json
     topic = InputValidator.sanitize_string(data.get('topic', ''))
     style = data.get('style', 'concise')
+    schedule = data.get('schedule', 'weekly')  # For date filtering
+    newsletter_id = data.get('newsletter_id')
 
     # Validate topic
     is_valid, error_msg = InputValidator.validate_topic(topic)
@@ -39,8 +296,44 @@ def generate_newsletter():
     if not is_valid:
         return APIResponse.error(error_msg)
 
-    # Queue the task asynchronously
-    task = generate_newsletter_async.delay(topic, style)
+    # Prevent duplicate generation for the same newsletter.
+    # This is critical because duplicate frontend requests (double-clicks, re-mounts,
+    # retries) can enqueue multiple Celery tasks which then run in parallel and
+    # blow through Brave rate limits.
+    if newsletter_id is not None:
+        from app.celery_config import celery
+
+        redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+        r = redis.Redis.from_url(redis_url, decode_responses=True)
+        dedupe_key = f"thinkwrapper:generate_newsletter:{newsletter_id}"
+
+        existing_task_id = r.get(dedupe_key)
+        if existing_task_id:
+            existing_state = celery.AsyncResult(existing_task_id).state
+            if existing_state not in ('SUCCESS', 'FAILURE', 'REVOKED'):
+                return APIResponse.processing(
+                    task_id=existing_task_id,
+                    message=f"Newsletter generation already in progress for '{topic}'"
+                )
+            # Terminal state: clear key so a new run can be started.
+            r.delete(dedupe_key)
+
+        # Reserve the slot atomically and use the reserved id as the Celery task_id.
+        task_id = str(uuid.uuid4())
+        reserved = r.set(dedupe_key, task_id, nx=True, ex=60 * 30)  # 30 minutes
+        if not reserved:
+            # Someone else reserved it just now; return that task.
+            concurrent_task_id = r.get(dedupe_key)
+            if concurrent_task_id:
+                return APIResponse.processing(
+                    task_id=concurrent_task_id,
+                    message=f"Newsletter generation already in progress for '{topic}'"
+                )
+
+        task = generate_newsletter_async.apply_async(args=[topic, style, schedule], task_id=task_id)
+    else:
+        # Fallback: no newsletter_id provided; queue normally.
+        task = generate_newsletter_async.delay(topic, style, schedule)
 
     return APIResponse.processing(
         task_id=task.id,
@@ -50,7 +343,7 @@ def generate_newsletter():
 
 @bp.route('/api/task/<task_id>', methods=['GET'])
 def get_task_status(task_id):
-    """Get the status of a Celery task."""
+    """Get the status of a Celery task with progress tracking."""
     from app.celery_config import celery
     task = celery.AsyncResult(task_id)
 
@@ -58,6 +351,12 @@ def get_task_status(task_id):
         response = {
             'state': task.state,
             'status': 'Task is waiting to be processed'
+        }
+    elif task.state == 'PROGRESS':
+        # Return progress information
+        response = {
+            'state': task.state,
+            'progress': task.info  # Contains stage, message, percent
         }
     elif task.state == 'FAILURE':
         response = {

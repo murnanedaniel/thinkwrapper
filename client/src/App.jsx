@@ -3,9 +3,9 @@ import { Routes, Route } from 'react-router-dom'
 import HomePage from './pages/HomePage'
 import Dashboard from './pages/Dashboard'
 import CreateNewsletter from './pages/CreateNewsletter'
+import EditNewsletter from './pages/EditNewsletter'
 import Login from './pages/Login'
 import Header from './components/Header'
-import './App.css'
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
@@ -47,6 +47,7 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/create" element={<CreateNewsletter />} />
+          <Route path="/newsletter/:id/edit" element={<EditNewsletter />} />
         </Routes>
       </main>
       <footer>

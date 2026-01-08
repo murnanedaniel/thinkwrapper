@@ -4,6 +4,7 @@ Application constants and configuration values.
 This module centralizes magic numbers and configuration values
 to improve maintainability and testability.
 """
+import os
 
 # AI Model Configuration
 DEFAULT_OPENAI_MODEL = "gpt-4"
@@ -33,7 +34,7 @@ VALID_DELIVERY_FORMATS = ['html', 'text', 'both']
 VALID_STYLES = ['professional', 'casual', 'technical']
 
 # Email settings
-DEFAULT_FROM_EMAIL = "newsletter@thinkwrapper.com"
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "murnanedaniel@hotmail.com")
 
 # Retry settings
 DEFAULT_RETRY_DELAY = 60

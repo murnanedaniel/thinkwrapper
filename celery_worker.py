@@ -17,6 +17,12 @@ Examples:
     python celery_worker.py worker --loglevel=info --autoscale=10,3
 """
 import sys
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
 from app.celery_config import celery
 
 if __name__ == '__main__':

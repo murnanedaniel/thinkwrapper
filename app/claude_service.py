@@ -329,6 +329,64 @@ def _sanitize_text_for_prompt(text: str) -> str:
     return sanitized
 
 
+def generate_search_topics(
+    main_topic: str,
+    num_topics: int = 5
+) -> Optional[List[str]]:
+    """
+    Generate search topic seeds using Claude Haiku for comprehensive newsletter research.
+    
+    Uses Haiku for fast, cost-effective topic generation before the main search.
+    
+    Args:
+        main_topic: The main newsletter topic
+        num_topics: Number of search topics to generate (default: 5)
+        
+    Returns:
+        List of search topic strings, or None on error
+        
+    Examples:
+        >>> topics = generate_search_topics("AI trends in healthcare")
+        >>> print(topics)
+        ['AI medical diagnosis breakthroughs', 'machine learning drug discovery', ...]
+    """
+    prompt = (
+        f"I'm creating a newsletter about: {main_topic}\n\n"
+        f"Please suggest {num_topics} specific, diverse search queries that would help me find "
+        f"the most relevant and current information for this newsletter. "
+        f"Each query should target a different aspect or angle of the topic.\n\n"
+        f"Respond with ONLY the search queries, one per line, without numbering or bullets."
+    )
+    
+    system_prompt = (
+        "You are a research assistant helping to find diverse, relevant content for newsletters. "
+        "Generate search queries that are specific, actionable, and likely to return high-quality results."
+    )
+    
+    # Use Haiku for fast, cost-effective topic generation
+    result = generate_text(
+        prompt=prompt,
+        model="claude-haiku-4-5",
+        max_tokens=300,
+        temperature=0.8,  # Slightly higher for creative query generation
+        system_prompt=system_prompt
+    )
+    
+    if not result:
+        logger.error(f"Failed to generate search topics for: {main_topic}")
+        return None
+    
+    # Parse the response into a list of topics
+    topics_text = result['text'].strip()
+    topics = [line.strip() for line in topics_text.split('\n') if line.strip()]
+    
+    # Remove any numbering or bullets that might have been included
+    topics = [topic.lstrip('0123456789.-•* ') for topic in topics]
+    
+    logger.info(f"Generated {len(topics)} search topics for '{main_topic}': {topics}")
+    return topics[:num_topics]  # Ensure we don't exceed the requested number
+
+
 def generate_newsletter_with_search(
     topic: str,
     style: str = "professional",
@@ -360,7 +418,7 @@ def generate_newsletter_with_search(
     
     # Get real search results from Brave Search
     logger.info(f"Searching Brave for topic: {topic}")
-    search_results = search_brave(query=topic, count=search_count, fallback_to_mock=True)
+    search_results = search_brave(query=topic, count=search_count, fallback_to_mock=False)
     
     if not search_results.get('success') or not search_results.get('results'):
         logger.error(f"Failed to get search results for topic: {topic}")
@@ -435,3 +493,75 @@ def generate_newsletter_with_search(
         'model': result['model'],
         'usage': result['usage']
     }
+
+
+def generate_newsletter_with_multi_search(
+    topic: str,
+    schedule: str = 'weekly',
+    style: str = "professional",
+    max_tokens: int = 2000,
+    progress_callback=None
+) -> Optional[Dict[str, Any]]:
+    """
+    Generate newsletter using Claude with multi-topic Brave Search and progress tracking.
+    
+    This refactored version uses modular components for better maintainability:
+    - ProgressTracker: Consistent progress reporting
+    - SearchOrchestrator: Multi-topic search coordination  
+    - NewsletterBuilder: Content assembly and generation
+    
+    Args:
+        topic: The main newsletter topic
+        schedule: Newsletter schedule ('daily', 'weekly', 'monthly', 'biweekly')
+        style: The writing style
+        max_tokens: Maximum tokens for the response
+        progress_callback: Optional callback function for progress updates
+        
+    Returns:
+        Dictionary with 'subject', 'content', 'articles', 'search_topics', and metadata
+        
+    Examples:
+        >>> newsletter = generate_newsletter_with_multi_search("AI trends", "weekly")
+    """
+    from .progress_tracker import ProgressTracker
+    from .search_orchestrator import SearchOrchestrator
+    from .newsletter_builder import NewsletterBuilder
+    
+    try:
+        # Initialize components
+        tracker = ProgressTracker(callback=progress_callback)
+        orchestrator = SearchOrchestrator(progress_tracker=tracker)
+        builder = NewsletterBuilder(progress_tracker=tracker)
+        
+        # Execute multi-topic search
+        search_results = orchestrator.execute_multi_search(
+            main_topic=topic,
+            schedule=schedule,
+            num_topics=5,
+            results_per_topic=10
+        )
+        
+        # Build newsletter from results
+        newsletter = builder.build(
+            topic=topic,
+            articles=search_results['articles'],
+            search_topics=search_results['search_topics'],
+            freshness_desc=search_results['freshness'],
+            style=style,
+            max_tokens=max_tokens
+        )
+        
+        # Combine results
+        tracker.complete('Newsletter generated successfully!')
+        
+        return {
+            **newsletter,
+            'articles': search_results['articles'],
+            'search_topics': search_results['search_topics'],
+            'total_articles': search_results['total_articles'],
+            'freshness': search_results['freshness']
+        }
+        
+    except Exception as e:
+        logger.error(f"Newsletter generation failed: {e}", exc_info=True)
+        return None

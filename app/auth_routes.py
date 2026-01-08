@@ -10,6 +10,19 @@ from .models import User, Base
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 
+def _frontend_redirect(target_path: str = "/") -> str:
+    """
+    Build a redirect URL back to the frontend SPA.
+
+    Inputs:
+        target_path: Path on the frontend to redirect to (e.g. "/dashboard")
+    Output:
+        Absolute URL string
+    """
+    base = os.getenv("FRONTEND_URL", "http://localhost:5173").rstrip("/")
+    path = target_path if target_path.startswith("/") else f"/{target_path}"
+    return f"{base}{path}"
+
 def get_db_session():
     """Get database session from app context."""
     if not hasattr(current_app, 'db_session_factory'):
@@ -62,8 +75,9 @@ def callback():
             # Log in the user
             login_user(user)
             
-            # Redirect to frontend
-            return redirect('/')
+            # Redirect back to the SPA (not the Flask server root).
+            # You can override the base with FRONTEND_URL in .env if needed.
+            return redirect(_frontend_redirect("/dashboard"))
         finally:
             db.close()
             
@@ -76,7 +90,7 @@ def logout():
     """Log out the current user."""
     logout_user()
     session.clear()
-    return redirect('/')
+    return redirect(_frontend_redirect("/"))
 
 @auth_bp.route('/user')
 def get_user():

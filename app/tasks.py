@@ -29,25 +29,39 @@ class CallbackTask(Task):
 
 
 @celery.task(base=CallbackTask, bind=True, max_retries=3, default_retry_delay=60)
-def generate_newsletter_async(self, topic, style="concise"):
+def generate_newsletter_async(self, topic, style="concise", schedule="weekly"):
     """
-    Generate newsletter content asynchronously.
+    Generate newsletter content asynchronously using Claude + Brave Search with progress tracking.
     
     Args:
         topic (str): The subject of the newsletter
         style (str): Style descriptor for the content
+        schedule (str): Newsletter schedule for date filtering ('daily', 'weekly', etc.)
         
     Returns:
-        dict: Generated content with subject and body
+        dict: Generated content with subject, body, articles, and search topics
     """
     try:
-        logger.info(f"Starting newsletter generation for topic: {topic}")
-        result = services.generate_newsletter_content(topic, style)
+        logger.info(f"Starting enhanced newsletter generation for topic: {topic}")
+        
+        # Create Celery progress callback using utility function
+        from app.progress_tracker import create_celery_callback
+        progress_callback = create_celery_callback(self)
+        
+        # Use enhanced Claude with multi-topic Brave Search
+        from app import claude_service
+        result = claude_service.generate_newsletter_with_multi_search(
+            topic=topic,
+            schedule=schedule,
+            style=style,
+            max_tokens=2000,
+            progress_callback=progress_callback
+        )
         
         if result is None:
             error_msg = (
                 f"Newsletter generation service returned None for topic '{topic}' - "
-                "check OpenAI service configuration, API key validity, and API availability"
+                "check Claude/Brave API configuration, API key validity, and API availability"
             )
             raise Exception(error_msg)
         
