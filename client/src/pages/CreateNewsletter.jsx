@@ -39,7 +39,15 @@ function CreateNewsletter({ isLoggedIn, user, paddleReady, refreshUser }) {
         const { state, status, result: taskResult } = res.data
         if (state === 'PROGRESS' && status) {
           setProgressMsg(status)
-          setProgressLog(log => [...log.slice(-6), status])
+          // Only show user-meaningful messages in the log
+          const skip = ['Starting newsletter', 'Mode:', 'Orchestrator', 'Timestamp:', '✓ Complete']
+          const isNoise = skip.some(s => status.startsWith(s))
+          if (!isNoise) {
+            setProgressLog(log => {
+              if (log.length > 0 && log[log.length - 1] === status) return log
+              return [...log.slice(-7), status]
+            })
+          }
         } else if (state === 'SUCCESS' && taskResult) {
           clearInterval(poll)
           setPreview(taskResult)

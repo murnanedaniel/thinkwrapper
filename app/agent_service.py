@@ -210,11 +210,10 @@ CRITICAL: Only use real URLs from your search results. Never hallucinate URLs.""
                                 log_progress(f"Searching: {q}")
                             elif tool_name == "WebFetch":
                                 url = tool_input.get("url", "")
-                                log_progress(f"Reading article: {url[:60]}...")
+                                log_progress(f"Reading article: {url[:70]}...")
                             elif tool_name == "Write":
                                 log_progress("Writing newsletter...")
-                            else:
-                                log_progress(f"{tool_name}...")
+                            # skip internal tools: TodoWrite, TodoRead, Read, Bash, etc.
                             
                 elif isinstance(message, ResultMessage):
                     # Final result message with timing
