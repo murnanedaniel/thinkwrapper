@@ -1,400 +1,93 @@
 from flask import (
-    Blueprint,
-    jsonify,
-    request,
-    current_app,
-    send_from_directory,
+    Blueprint, jsonify, request, current_app, send_from_directory,
 )
 from datetime import datetime
-from .newsletter_synthesis import NewsletterSynthesizer, NewsletterRenderer, NewsletterConfig
+from functools import wraps
+from flask_login import current_user, login_required
+
+from .newsletter_synthesis import NewsletterRenderer
 from .services import send_email
 from . import claude_service
 from .api_utils import APIResponse, InputValidator, require_json
-from app.tasks import generate_newsletter_async, send_email_async
+from .models import Newsletter, Issue, User
 
 bp = Blueprint("routes", __name__)
 
 
+# --- Auth decorators ---
+
+def login_required_api(f):
+    """Return 401 JSON instead of redirect for unauthenticated API calls."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not current_user.is_authenticated:
+            return APIResponse.error('Authentication required', status_code=401)
+        return f(*args, **kwargs)
+    return decorated
+
+
+def subscription_required(f):
+    """Require an active subscription."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not current_user.is_authenticated:
+            return APIResponse.error('Authentication required', status_code=401)
+        if current_user.subscription_status != 'active':
+            return APIResponse.error('Active subscription required', status_code=403)
+        return f(*args, **kwargs)
+    return decorated
+
+
+def get_db():
+    return current_app.db_session_factory()
+
+
+# --- Static file serving ---
+
 @bp.route("/")
 def index():
-    """Serve the SPA index page."""
     return send_from_directory(current_app.static_folder, "index.html")
 
 
-@bp.route("/api/generate", methods=["POST"])
+# --- Newsletter Preview (NO auth required - this is the hook) ---
+
+@bp.route('/api/newsletter/preview', methods=['POST'])
 @require_json
-def generate_newsletter():
-    """Generate a newsletter based on the provided topic."""
-    data = request.json
-    topic = InputValidator.sanitize_string(data.get('topic', ''))
-    style = data.get('style', 'concise')
-
-    # Validate topic
-    is_valid, error_msg = InputValidator.validate_topic(topic)
-    if not is_valid:
-        return APIResponse.error(error_msg)
-
-    # Validate style
-    is_valid, error_msg = InputValidator.validate_style(style)
-    if not is_valid:
-        return APIResponse.error(error_msg)
-
-    # Queue the task asynchronously
-    task = generate_newsletter_async.delay(topic, style)
-
-    return APIResponse.processing(
-        task_id=task.id,
-        message=f"Generating newsletter about '{topic}'"
-    )
-
-
-@bp.route('/api/task/<task_id>', methods=['GET'])
-def get_task_status(task_id):
-    """Get the status of a Celery task."""
-    from app.celery_config import celery
-    task = celery.AsyncResult(task_id)
-
-    if task.state == 'PENDING':
-        response = {
-            'state': task.state,
-            'status': 'Task is waiting to be processed'
-        }
-    elif task.state == 'FAILURE':
-        response = {
-            'state': task.state,
-            'status': str(task.info),
-        }
-    else:
-        response = {
-            'state': task.state,
-            'result': task.result if task.state == 'SUCCESS' else None
-        }
-
-    return jsonify(response)
-
-
-@bp.route('/api/admin/synthesize', methods=['POST'])
-@require_json
-def synthesize_newsletter():
+def preview_newsletter_generate():
     """
-    Admin endpoint to trigger newsletter synthesis on demand.
-
-    Expected JSON payload:
-    {
-        "newsletter_id": 1,
-        "topic": "AI Weekly",
-        "style": "professional",  // optional
-        "format": "html",  // optional: html, text, both
-        "send_email": false,  // optional
-        "email_to": "admin@example.com"  // optional, required if send_email is true
-    }
+    Generate a newsletter preview. No auth required.
+    This is the "try before you buy" endpoint.
     """
     data = request.json
-
-    newsletter_id = data.get('newsletter_id')
     topic = InputValidator.sanitize_string(data.get('topic', ''))
-
-    if not newsletter_id:
-        return APIResponse.error('newsletter_id is required')
-
-    # Validate topic
-    is_valid, error_msg = InputValidator.validate_topic(topic)
-    if not is_valid:
-        return APIResponse.error(error_msg)
-
-    # Optional parameters
+    description = data.get('description', '')
     style = data.get('style', 'professional')
-    output_format = data.get('format', 'html')
-    send_email_flag = data.get('send_email', False)
-    email_to = data.get('email_to')
 
-    # Validate style
+    is_valid, error_msg = InputValidator.validate_topic(topic)
+    if not is_valid:
+        return APIResponse.error(error_msg)
+
     is_valid, error_msg = InputValidator.validate_style(style)
     if not is_valid:
         return APIResponse.error(error_msg)
 
-    # Validate format
-    is_valid, error_msg = InputValidator.validate_format(output_format)
-    if not is_valid:
-        return APIResponse.error(error_msg)
+    # Build a richer topic prompt from topic + description
+    full_topic = topic
+    if description:
+        full_topic = f"{topic}. Focus on: {description}"
 
-    # Validate send_email requirements
-    if send_email_flag:
-        is_valid, error_msg = InputValidator.validate_email(email_to)
-        if not is_valid:
-            return APIResponse.error(error_msg)
-
-    # Initialize synthesizer and renderer
-    synthesizer = NewsletterSynthesizer()
-    renderer = NewsletterRenderer()
-
-    try:
-        # Generate newsletter on demand
-        result = synthesizer.generate_on_demand(
-            newsletter_id=newsletter_id,
-            topic=topic,
-            style=style
-        )
-
-        if not result.get('success'):
-            return APIResponse.error(
-                'Newsletter synthesis failed',
-                details=result.get('error'),
-                status_code=500
-            )
-
-        # Prepare content for rendering
-        content = {
-            'subject': result['subject'],
-            'content': result['content']
-        }
-
-        # Render in requested format(s)
-        rendered_output = {}
-
-        if output_format == 'both':
-            rendered_output['html'] = renderer.render_html(content)
-            rendered_output['text'] = renderer.render_plain_text(content)
-        elif output_format == 'text':
-            rendered_output['text'] = renderer.render_plain_text(content)
-        else:  # default to html
-            rendered_output['html'] = renderer.render_html(content)
-
-        # Send email if requested
-        email_sent = False
-        if send_email_flag:
-            email_content = rendered_output.get('html') or rendered_output.get('text')
-            email_sent = send_email(email_to, result['subject'], email_content)
-
-        return APIResponse.success(data={
-            'subject': result['subject'],
-            'content': result['content'],
-            'rendered': rendered_output,
-            'metadata': {
-                'content_items_count': result['content_items_count'],
-                'generated_at': result['generated_at'],
-                'style': result['style'],
-                'format': output_format,
-                'email_sent': email_sent
-            }
-        })
-
-    except Exception as e:
-        current_app.logger.error(f"Newsletter synthesis error: {str(e)}")
-        return APIResponse.error(
-            'Internal server error',
-            details=str(e),
-            status_code=500
-        )
-
-
-@bp.route('/api/admin/newsletter/config', methods=['GET', 'POST'])
-def newsletter_config():
-    """
-    Get or update newsletter configuration settings.
-
-    GET: Returns current configuration
-    POST: Updates configuration with provided settings
-    """
-    config = NewsletterConfig()
-
-    if request.method == 'GET':
-        return APIResponse.success(data=config.to_dict())
-
-    # POST - update configuration
-    if not request.is_json or not request.json:
-        return APIResponse.error('No configuration data provided')
-
-    data = request.json
-
-    try:
-        config.from_dict(data)
-        is_valid, error_message = config.validate()
-
-        if not is_valid:
-            return APIResponse.error(error_message)
-
-        # In a real implementation, save config to database
-        return APIResponse.success(data={'config': config.to_dict()})
-
-    except Exception as e:
-        return APIResponse.error(
-            'Failed to update configuration',
-            details=str(e),
-            status_code=500
-        )
-
-
-@bp.route('/api/admin/newsletter/preview', methods=['POST'])
-@require_json
-def preview_newsletter():
-    """
-    Preview newsletter in different formats without sending.
-
-    Expected JSON payload:
-    {
-        "subject": "Newsletter Subject",
-        "content": "Newsletter content...",
-        "format": "html"  // html, text, or both
-    }
-    """
-    data = request.json
-
-    subject = InputValidator.sanitize_string(data.get('subject', ''))
-    content = InputValidator.sanitize_string(data.get('content', ''))
-    output_format = data.get('format', 'html')
-
-    if not subject:
-        return APIResponse.error('subject is required')
-    if not content:
-        return APIResponse.error('content is required')
-
-    # Validate format
-    is_valid, error_msg = InputValidator.validate_format(output_format)
-    if not is_valid:
-        return APIResponse.error(error_msg)
-
-    renderer = NewsletterRenderer()
-    content_dict = {'subject': subject, 'content': content}
-
-    try:
-        rendered_output = {}
-
-        if output_format == 'both':
-            rendered_output['html'] = renderer.render_html(content_dict)
-            rendered_output['text'] = renderer.render_plain_text(content_dict)
-        elif output_format == 'text':
-            rendered_output['text'] = renderer.render_plain_text(content_dict)
-        else:
-            rendered_output['html'] = renderer.render_html(content_dict)
-
-        return APIResponse.success(data={'rendered': rendered_output})
-
-    except Exception as e:
-        return APIResponse.error(
-            'Preview generation failed',
-            details=str(e),
-            status_code=500
-        )
-
-
-@bp.route('/api/claude/generate', methods=['POST'])
-@require_json
-def claude_generate():
-    """
-    Generate text using Claude API (demo endpoint).
-
-    Request body:
-        {
-            "prompt": "Your prompt text",
-            "model": "claude-haiku-4-5" (optional),
-            "max_tokens": 1024 (optional),
-            "temperature": 1.0 (optional),
-            "system_prompt": "System prompt" (optional)
-        }
-
-    Response:
-        {
-            "success": true,
-            "text": "Generated text...",
-            "model": "claude-haiku-4-5",
-            "usage": {"input_tokens": 10, "output_tokens": 100}
-        }
-    """
-    data = request.json
-
-    prompt = InputValidator.sanitize_string(data.get('prompt', ''))
-    if not prompt:
-        return APIResponse.error('No prompt provided')
-
-    # Optional parameters
-    model = data.get('model', 'claude-haiku-4-5')
-    max_tokens = data.get('max_tokens', 1024)
-    temperature = data.get('temperature', 1.0)
-    system_prompt = data.get('system_prompt')
-
-    # Generate text using Claude
-    result = claude_service.generate_text(
-        prompt=prompt,
-        model=model,
-        max_tokens=max_tokens,
-        temperature=temperature,
-        system_prompt=system_prompt
+    # Generate using Claude + Brave Search (synchronous for preview)
+    result = claude_service.generate_newsletter_with_search(
+        topic=full_topic,
+        style=style,
+        max_tokens=2000,
+        search_count=10
     )
 
     if result is None:
-        return APIResponse.error(
-            'Failed to generate text. Check API key configuration.',
-            status_code=500
-        )
-
-    return APIResponse.success(data={
-        'text': result['text'],
-        'model': result['model'],
-        'usage': result['usage'],
-        'stop_reason': result['stop_reason']
-    })
-
-@bp.route('/api/claude/newsletter', methods=['POST'])
-@require_json
-def claude_newsletter():
-    """
-    Generate newsletter content using Claude API with Brave Search integration.
-
-    Request body:
-        {
-            "topic": "Newsletter topic",
-            "style": "professional" (optional),
-            "max_tokens": 2000 (optional),
-            "search_count": 10 (optional),
-            "use_search": true (optional, defaults to true for real URLs)
-        }
-
-    Response:
-        {
-            "success": true,
-            "subject": "Newsletter subject",
-            "content": "Newsletter body...",
-            "articles": [{"title": "...", "url": "...", "description": "..."}],
-            "search_source": "brave" or "mock",
-            "model": "claude-haiku-4-5",
-            "usage": {"input_tokens": 50, "output_tokens": 500}
-        }
-    """
-    data = request.json
-
-    topic = InputValidator.sanitize_string(data.get('topic', ''))
-
-    # Validate topic
-    is_valid, error_msg = InputValidator.validate_topic(topic)
-    if not is_valid:
-        return APIResponse.error(error_msg)
-
-    # Optional parameters
-    style = data.get('style', 'professional')
-    max_tokens = data.get('max_tokens', 2000)
-    search_count = data.get('search_count', 10)
-    use_search = data.get('use_search', True)
-
-    # Validate style
-    is_valid, error_msg = InputValidator.validate_style(style)
-    if not is_valid:
-        return APIResponse.error(error_msg)
-
-    # Generate newsletter using Claude with Brave Search integration
-    if use_search:
-        result = claude_service.generate_newsletter_with_search(
-            topic=topic,
-            style=style,
-            max_tokens=max_tokens,
-            search_count=search_count
-        )
-    else:
-        # Fallback to old method without search (for backwards compatibility)
+        # Fallback to Claude without search
         result = claude_service.generate_newsletter_content_claude(
-            topic=topic,
-            style=style,
-            max_tokens=max_tokens
+            topic=full_topic, style=style, max_tokens=2000
         )
 
     if result is None:
@@ -403,15 +96,187 @@ def claude_newsletter():
             status_code=500
         )
 
-    # Build response data
-    response_data = {
+    # Render HTML preview
+    renderer = NewsletterRenderer()
+    html_preview = renderer.render_html({
+        'subject': result['subject'],
+        'content': result['content']
+    })
+
+    return APIResponse.success(data={
         'subject': result['subject'],
         'content': result['content'],
-        'model': result['model'],
-        'usage': result['usage']
+        'html_preview': html_preview,
+        'articles': result.get('articles', []),
+        'search_source': result.get('search_source', 'none'),
+    })
+
+
+# --- Newsletter CRUD (auth + subscription required) ---
+
+@bp.route('/api/newsletters', methods=['GET'])
+@login_required_api
+def list_newsletters():
+    """List current user's newsletters."""
+    db = get_db()
+    newsletters = db.query(Newsletter).filter_by(user_id=current_user.id).order_by(Newsletter.created_at.desc()).all()
+
+    return APIResponse.success(data=[
+        {
+            'id': nl.id,
+            'name': nl.name,
+            'topic': nl.topic,
+            'description': nl.description,
+            'style': nl.style,
+            'status': nl.status,
+            'schedule': nl.schedule,
+            'last_sent_at': nl.last_sent_at.isoformat() if nl.last_sent_at else None,
+            'created_at': nl.created_at.isoformat() if nl.created_at else None,
+            'issue_count': len(nl.issues),
+        }
+        for nl in newsletters
+    ])
+
+
+@bp.route('/api/newsletters', methods=['POST'])
+@subscription_required
+@require_json
+def create_newsletter():
+    """
+    Create a newsletter and its first issue, then send it.
+    Called after payment is confirmed.
+    """
+    data = request.json
+    topic = InputValidator.sanitize_string(data.get('topic', ''))
+    name = InputValidator.sanitize_string(data.get('name', ''))
+    description = data.get('description', '')
+    style = data.get('style', 'professional')
+    schedule = data.get('schedule', 'weekly')
+    subject = data.get('subject', '')
+    content = data.get('content', '')
+
+    is_valid, error_msg = InputValidator.validate_topic(topic)
+    if not is_valid:
+        return APIResponse.error(error_msg)
+
+    if not name:
+        name = topic[:100]
+    if not subject or not content:
+        return APIResponse.error('subject and content are required (from preview)')
+
+    db = get_db()
+
+    # Create newsletter
+    newsletter = Newsletter(
+        user_id=current_user.id,
+        name=name,
+        topic=topic,
+        description=description,
+        style=style,
+        schedule=schedule,
+        status='active',
+    )
+    db.add(newsletter)
+    db.flush()
+
+    # Create first issue
+    issue = Issue(
+        newsletter_id=newsletter.id,
+        subject=subject,
+        content=content,
+    )
+    db.add(issue)
+    db.commit()
+
+    # Send the first issue immediately
+    renderer = NewsletterRenderer()
+    html_content = renderer.render_html({'subject': subject, 'content': content})
+
+    email_sent = send_email(current_user.email, subject, html_content)
+    if email_sent:
+        issue.sent_at = datetime.utcnow()
+        newsletter.last_sent_at = datetime.utcnow()
+        db.commit()
+
+    return APIResponse.success(data={
+        'newsletter_id': newsletter.id,
+        'issue_id': issue.id,
+        'email_sent': email_sent,
+    })
+
+
+# --- Existing generation endpoints (kept for API compatibility) ---
+
+@bp.route("/api/generate", methods=["POST"])
+@require_json
+def generate_newsletter():
+    """Generate a newsletter (async via Celery)."""
+    from app.tasks import generate_newsletter_async
+    data = request.json
+    topic = InputValidator.sanitize_string(data.get('topic', ''))
+    style = data.get('style', 'concise')
+
+    is_valid, error_msg = InputValidator.validate_topic(topic)
+    if not is_valid:
+        return APIResponse.error(error_msg)
+    is_valid, error_msg = InputValidator.validate_style(style)
+    if not is_valid:
+        return APIResponse.error(error_msg)
+
+    task = generate_newsletter_async.delay(topic, style)
+    return APIResponse.processing(
+        task_id=task.id,
+        message=f"Generating newsletter about '{topic}'"
+    )
+
+
+@bp.route('/api/task/<task_id>', methods=['GET'])
+def get_task_status(task_id):
+    from app.celery_config import celery
+    task = celery.AsyncResult(task_id)
+    if task.state == 'PENDING':
+        return jsonify({'state': task.state, 'status': 'Task is waiting to be processed'})
+    elif task.state == 'FAILURE':
+        return jsonify({'state': task.state, 'status': str(task.info)})
+    else:
+        return jsonify({'state': task.state, 'result': task.result if task.state == 'SUCCESS' else None})
+
+
+@bp.route('/api/claude/newsletter', methods=['POST'])
+@require_json
+def claude_newsletter():
+    """Generate newsletter content using Claude API with Brave Search."""
+    data = request.json
+    topic = InputValidator.sanitize_string(data.get('topic', ''))
+    is_valid, error_msg = InputValidator.validate_topic(topic)
+    if not is_valid:
+        return APIResponse.error(error_msg)
+
+    style = data.get('style', 'professional')
+    max_tokens = data.get('max_tokens', 2000)
+    search_count = data.get('search_count', 10)
+    use_search = data.get('use_search', True)
+
+    is_valid, error_msg = InputValidator.validate_style(style)
+    if not is_valid:
+        return APIResponse.error(error_msg)
+
+    if use_search:
+        result = claude_service.generate_newsletter_with_search(
+            topic=topic, style=style, max_tokens=max_tokens, search_count=search_count
+        )
+    else:
+        result = claude_service.generate_newsletter_content_claude(
+            topic=topic, style=style, max_tokens=max_tokens
+        )
+
+    if result is None:
+        return APIResponse.error('Failed to generate newsletter.', status_code=500)
+
+    response_data = {
+        'subject': result['subject'], 'content': result['content'],
+        'model': result['model'], 'usage': result['usage']
     }
-    
-    # Add search-specific fields if available
     if 'articles' in result:
         response_data['articles'] = result['articles']
         response_data['search_source'] = result['search_source']
@@ -420,24 +285,13 @@ def claude_newsletter():
     return APIResponse.success(data=response_data)
 
 
+# --- Payment endpoints ---
+
 @bp.route('/api/payment/checkout', methods=['POST'])
 @require_json
 def create_payment_checkout():
-    """
-    Create a Paddle checkout session for payment.
-
-    Expected JSON payload:
-    {
-        "price_id": "pri_xxx",
-        "customer_email": "user@example.com",
-        "success_url": "https://example.com/success",
-        "cancel_url": "https://example.com/cancel"
-    }
-    """
     from .payment_service import get_paddle_service
-
     data = request.json
-
     price_id = data.get('price_id')
     customer_email = data.get('customer_email')
     success_url = data.get('success_url')
@@ -446,22 +300,16 @@ def create_payment_checkout():
 
     if not price_id:
         return APIResponse.error('price_id is required')
-
-    # Validate email
     is_valid, error_msg = InputValidator.validate_email(customer_email)
     if not is_valid:
         return APIResponse.error(error_msg)
-
     if not success_url:
         return APIResponse.error('success_url is required')
 
     paddle_service = get_paddle_service()
     checkout_session = paddle_service.create_checkout_session(
-        price_id=price_id,
-        customer_email=customer_email,
-        success_url=success_url,
-        cancel_url=cancel_url,
-        metadata=metadata
+        price_id=price_id, customer_email=customer_email,
+        success_url=success_url, cancel_url=cancel_url, metadata=metadata
     )
 
     if checkout_session:
@@ -469,23 +317,14 @@ def create_payment_checkout():
             'checkout_url': checkout_session.get('data', {}).get('url'),
             'session_id': checkout_session.get('data', {}).get('id')
         })
-    else:
-        return APIResponse.error(
-            'Failed to create checkout session',
-            status_code=500
-        )
+    return APIResponse.error('Failed to create checkout session', status_code=500)
+
 
 @bp.route('/api/payment/webhook', methods=['POST'])
 def paddle_webhook():
-    """
-    Handle Paddle webhook notifications.
-
-    This endpoint receives payment status updates from Paddle.
-    Webhook signature is verified for security.
-    """
+    """Handle Paddle webhook notifications with DB updates."""
     from .payment_service import get_paddle_service
 
-    # Get raw payload and signature
     payload = request.get_data(as_text=True)
     signature = request.headers.get('Paddle-Signature', '')
 
@@ -493,13 +332,11 @@ def paddle_webhook():
         current_app.logger.error("Webhook received without signature")
         return APIResponse.error('Missing signature')
 
-    # Verify webhook signature
     paddle_service = get_paddle_service()
     if not paddle_service.verify_webhook_signature(payload, signature):
         current_app.logger.error("Invalid webhook signature")
         return APIResponse.error('Invalid signature', status_code=401)
 
-    # Parse webhook data
     try:
         webhook_data = request.json
         if not webhook_data:
@@ -511,62 +348,79 @@ def paddle_webhook():
         if not event_type:
             return APIResponse.error('Missing event_type')
 
-        # Process the webhook event
         result = paddle_service.process_webhook_event(event_type, event_data)
 
-        current_app.logger.info(
-            f"Webhook processed: {event_type} - Result: {result.get('status')}"
-        )
-
-        return APIResponse.success(data={
-            'status': 'received',
-            'event_type': event_type
-        })
+        current_app.logger.info(f"Webhook processed: {event_type} - {result.get('status')}")
+        return APIResponse.success(data={'status': 'received', 'event_type': event_type})
 
     except Exception as e:
         current_app.logger.error(f"Webhook processing error: {str(e)}")
-        return APIResponse.error(
-            'Webhook processing failed',
-            status_code=500
-        )
+        return APIResponse.error('Webhook processing failed', status_code=500)
+
+
+@bp.route('/api/payment/activate-by-checkout', methods=['POST'])
+@require_json
+def activate_by_checkout():
+    """
+    Activate a user's subscription based on a completed Paddle checkout event.
+    Called from the frontend after checkout.completed fires.
+    This is needed because the Paddle webhook may not have reached the server yet.
+    """
+    if not current_user.is_authenticated:
+        return APIResponse.error('Authentication required', status_code=401)
+
+    data = request.json
+    transaction_id = data.get('transaction_id')
+    customer_id = data.get('customer_id')
+
+    db = get_db()
+    from .models import User
+    user = db.query(User).filter_by(id=current_user.id).first()
+    if not user:
+        return APIResponse.error('User not found', status_code=404)
+
+    # Activate the subscription based on the checkout event
+    user.subscription_status = 'active'
+    if customer_id and not user.paddle_customer_id:
+        user.paddle_customer_id = customer_id
+    db.commit()
+
+    current_app.logger.info(f"Subscription activated via checkout for {user.email} (txn: {transaction_id})")
+    return APIResponse.success(data={'subscription_status': 'active'})
+
 
 @bp.route('/api/payment/subscription/<subscription_id>/cancel', methods=['POST'])
 def cancel_subscription(subscription_id):
-    """
-    Cancel a subscription.
-
-    Optional JSON payload:
-    {
-        "effective_date": "2024-12-31"  # ISO format, optional
-    }
-    """
     from .payment_service import get_paddle_service
-
-    if not subscription_id:
-        return APIResponse.error('subscription_id is required')
-
     data = request.json or {}
-    effective_date = data.get('effective_date')
-
     paddle_service = get_paddle_service()
-    success = paddle_service.cancel_subscription(
-        subscription_id=subscription_id,
-        effective_date=effective_date
-    )
-
+    success = paddle_service.cancel_subscription(subscription_id, data.get('effective_date'))
     if success:
         return APIResponse.success(message='Subscription cancelled')
-    else:
-        return APIResponse.error(
-            'Failed to cancel subscription',
-            status_code=500
-        )
+    return APIResponse.error('Failed to cancel subscription', status_code=500)
 
-# Catch-all to support client-side routing
+
+# --- Config endpoint (for frontend to get Paddle settings) ---
+
+@bp.route('/api/config', methods=['GET'])
+def get_frontend_config():
+    """Return public configuration for the frontend."""
+    return APIResponse.success(data={
+        'paddle_client_token': os.environ.get('PADDLE_CLIENT_TOKEN', ''),
+        'paddle_price_id': os.environ.get('PADDLE_PRICE_ID', ''),
+        'paddle_vendor_id': os.environ.get('PADDLE_VENDOR_ID', ''),
+        'paddle_product_id': os.environ.get('PADDLE_PRODUCT_ID', ''),
+        'paddle_sandbox': os.environ.get('PADDLE_SANDBOX', 'true').lower() == 'true',
+    })
+
+
+# Catch-all for SPA routing
 @bp.route("/<path:path>")
 def catch_all(path):
-    """Serve static files or return index.html for client-side routing."""
     try:
         return send_from_directory(current_app.static_folder, path)
     except Exception:
         return send_from_directory(current_app.static_folder, "index.html")
+
+
+import os

@@ -114,7 +114,7 @@ class TestNewsletterCreationJourney:
         assert response.json['success'] is False
         assert 'style' in response.json['error'].lower()
 
-    @patch('app.routes.generate_newsletter_async')
+    @patch('app.tasks.generate_newsletter_async')
     def test_generate_newsletter_success(self, mock_task, client):
         """Test successful newsletter generation queuing."""
         mock_result = Mock()
@@ -157,7 +157,7 @@ class TestNewsletterCreationJourney:
         assert response.json['state'] == 'SUCCESS'
         assert 'result' in response.json
 
-    @patch('app.routes.generate_newsletter_async')
+    @patch('app.tasks.generate_newsletter_async')
     def test_full_newsletter_creation_flow(self, mock_task, client):
         """Test the complete newsletter creation flow."""
         # Step 1: Queue newsletter generation
@@ -174,73 +174,6 @@ class TestNewsletterCreationJourney:
         task_id = response.json['task_id']
         assert task_id == 'flow-test-task'
 
-
-class TestAdminSynthesisJourney:
-    """Test the admin newsletter synthesis journey."""
-
-    def test_synthesize_requires_json(self, client):
-        """Verify synthesize endpoint requires JSON."""
-        response = client.post('/api/admin/synthesize', data='not json')
-        assert response.status_code == 415
-
-    def test_synthesize_validates_required_fields(self, client):
-        """Verify required field validation."""
-        # Missing newsletter_id
-        response = client.post('/api/admin/synthesize', json={
-            'topic': 'Test Topic'
-        })
-        assert response.status_code == 400
-        assert 'newsletter_id' in response.json['error']
-
-        # Missing topic
-        response = client.post('/api/admin/synthesize', json={
-            'newsletter_id': 1
-        })
-        assert response.status_code == 400
-        assert 'Topic' in response.json['error']
-
-    def test_synthesize_validates_email_when_sending(self, client):
-        """Verify email validation when send_email is true."""
-        response = client.post('/api/admin/synthesize', json={
-            'newsletter_id': 1,
-            'topic': 'Test Newsletter',
-            'send_email': True,
-            'email_to': 'invalid-email'
-        })
-        assert response.status_code == 400
-        assert 'email' in response.json['error'].lower()
-
-    @patch('app.routes.NewsletterSynthesizer')
-    @patch('app.routes.NewsletterRenderer')
-    def test_synthesize_success(self, mock_renderer_cls, mock_synth_cls, client):
-        """Test successful newsletter synthesis."""
-        # Mock synthesizer
-        mock_synth = Mock()
-        mock_synth.generate_on_demand.return_value = {
-            'success': True,
-            'subject': 'Test Subject',
-            'content': 'Test Content',
-            'content_items_count': 2,
-            'generated_at': '2026-01-02T12:00:00Z',
-            'style': 'professional'
-        }
-        mock_synth_cls.return_value = mock_synth
-
-        # Mock renderer
-        mock_renderer = Mock()
-        mock_renderer.render_html.return_value = '<html>Test</html>'
-        mock_renderer_cls.return_value = mock_renderer
-
-        response = client.post('/api/admin/synthesize', json={
-            'newsletter_id': 1,
-            'topic': 'AI Weekly Update',
-            'style': 'professional',
-            'format': 'html'
-        })
-
-        assert response.status_code == 200
-        assert response.json['success'] is True
-        assert 'data' in response.json
 
 
 class TestPaymentJourney:
@@ -341,98 +274,8 @@ class TestPaymentJourney:
         assert response.json['success'] is True
 
 
-class TestPreviewJourney:
-    """Test the newsletter preview journey."""
-
-    def test_preview_requires_json(self, client):
-        """Verify preview endpoint requires JSON."""
-        response = client.post('/api/admin/newsletter/preview', data='not json')
-        assert response.status_code == 415
-
-    def test_preview_validates_required_fields(self, client):
-        """Verify required field validation."""
-        # Missing subject
-        response = client.post('/api/admin/newsletter/preview', json={
-            'content': 'Some content'
-        })
-        assert response.status_code == 400
-        assert 'subject' in response.json['error']
-
-        # Missing content
-        response = client.post('/api/admin/newsletter/preview', json={
-            'subject': 'Test Subject'
-        })
-        assert response.status_code == 400
-        assert 'content' in response.json['error']
-
-    def test_preview_validates_format(self, client):
-        """Verify format validation."""
-        response = client.post('/api/admin/newsletter/preview', json={
-            'subject': 'Test Subject',
-            'content': 'Test content',
-            'format': 'invalid'
-        })
-        assert response.status_code == 400
-        assert 'format' in response.json['error'].lower()
-
-    def test_preview_success_html(self, client):
-        """Test successful HTML preview."""
-        response = client.post('/api/admin/newsletter/preview', json={
-            'subject': 'Weekly Digest',
-            'content': '# Welcome\n\nThis is the newsletter.',
-            'format': 'html'
-        })
-
-        assert response.status_code == 200
-        assert response.json['success'] is True
-        assert 'rendered' in response.json['data']
-        assert 'html' in response.json['data']['rendered']
-
-    def test_preview_success_both_formats(self, client):
-        """Test preview with both formats."""
-        response = client.post('/api/admin/newsletter/preview', json={
-            'subject': 'Weekly Digest',
-            'content': 'Newsletter content here',
-            'format': 'both'
-        })
-
-        assert response.status_code == 200
-        rendered = response.json['data']['rendered']
-        assert 'html' in rendered
-        assert 'text' in rendered
-
-
 class TestClaudeAPIJourney:
     """Test the Claude API integration journey."""
-
-    def test_claude_generate_requires_json(self, client):
-        """Verify Claude generate requires JSON."""
-        response = client.post('/api/claude/generate', data='not json')
-        assert response.status_code == 415
-
-    def test_claude_generate_validates_prompt(self, client):
-        """Verify prompt validation."""
-        response = client.post('/api/claude/generate', json={'prompt': ''})
-        assert response.status_code == 400
-        assert 'prompt' in response.json['error'].lower() or 'provided' in response.json['error'].lower()
-
-    @patch('app.routes.claude_service')
-    def test_claude_generate_success(self, mock_claude, client):
-        """Test successful Claude text generation."""
-        mock_claude.generate_text.return_value = {
-            'text': 'Generated response',
-            'model': 'claude-haiku-4-5',
-            'usage': {'input_tokens': 10, 'output_tokens': 50},
-            'stop_reason': 'end_turn'
-        }
-
-        response = client.post('/api/claude/generate', json={
-            'prompt': 'Explain AI in simple terms'
-        })
-
-        assert response.status_code == 200
-        assert response.json['success'] is True
-        assert 'text' in response.json['data']
 
     def test_claude_newsletter_validates_topic(self, client):
         """Verify newsletter topic validation."""
@@ -441,10 +284,10 @@ class TestClaudeAPIJourney:
         })
         assert response.status_code == 400
 
-    @patch('app.routes.claude_service')
-    def test_claude_newsletter_success(self, mock_claude, client):
+    @patch('app.claude_service.generate_newsletter_with_search')
+    def test_claude_newsletter_success(self, mock_search, client):
         """Test successful Claude newsletter generation."""
-        mock_claude.generate_newsletter_with_search.return_value = {
+        mock_search.return_value = {
             'subject': 'AI Newsletter',
             'content': 'Newsletter content here',
             'model': 'claude-haiku-4-5',
@@ -506,34 +349,3 @@ class TestInputValidation:
             assert response.status_code == 400, f"Email {email} should be invalid"
 
 
-class TestConfigurationJourney:
-    """Test newsletter configuration journey."""
-
-    def test_get_config(self, client):
-        """Test getting newsletter configuration."""
-        response = client.get('/api/admin/newsletter/config')
-        assert response.status_code == 200
-        assert response.json['success'] is True
-        assert 'data' in response.json
-
-        config = response.json['data']
-        assert 'schedule' in config
-        assert 'delivery_format' in config
-        assert 'style' in config
-
-    def test_update_config_invalid(self, client):
-        """Test updating config with invalid values."""
-        response = client.post('/api/admin/newsletter/config', json={
-            'schedule': 'invalid_schedule'
-        })
-        assert response.status_code == 400
-
-    def test_update_config_valid(self, client):
-        """Test updating config with valid values."""
-        response = client.post('/api/admin/newsletter/config', json={
-            'schedule': 'weekly',
-            'style': 'professional',
-            'delivery_format': 'html'
-        })
-        assert response.status_code == 200
-        assert response.json['success'] is True
