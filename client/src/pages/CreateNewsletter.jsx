@@ -92,35 +92,41 @@ function CreateNewsletter({ isLoggedIn, user, paddleReady, refreshUser }) {
     window.Paddle.Update({
       eventCallback: async (event) => {
         if (event.name === 'checkout.completed') {
-          // Wait for webhook to process
-          setTimeout(async () => {
+          setStep(STATES.CREATING)
+          try {
+            // Activate subscription immediately via checkout data (webhook may lag)
+            const txnData = event.data?.transaction || {}
+            await axios.post('/api/payment/activate-by-checkout', {
+              transaction_id: txnData.id,
+              customer_id: txnData.customer?.id,
+            })
             if (refreshUser) await refreshUser()
-            // Try creating the newsletter
-            setStep(STATES.CREATING)
-            try {
-              const response = await axios.post('/api/newsletters', {
-                topic: formData.topic,
-                name: formData.name || formData.topic,
-                description: formData.description,
-                style: formData.style,
-                schedule: formData.schedule,
-                subject: preview?.subject,
-                content: preview?.content,
-              })
-              if (response.data.success) {
-                setResult(response.data.data)
-                setStep(STATES.SUCCESS)
-              } else {
-                setError(response.data.error)
-                setStep(STATES.PREVIEW)
-              }
-            } catch (err) {
-              setError(err.response?.data?.error || 'Failed to create newsletter after payment')
+
+            // Create the newsletter
+            const response = await axios.post('/api/newsletters', {
+              topic: formData.topic,
+              name: formData.name || formData.topic,
+              description: formData.description,
+              style: formData.style,
+              schedule: formData.schedule,
+              subject: preview?.subject,
+              content: preview?.content,
+            })
+            if (response.data.success) {
+              setResult(response.data.data)
+              setStep(STATES.SUCCESS)
+            } else {
+              setError(response.data.error)
               setStep(STATES.PREVIEW)
             }
-          }, 3000)
+          } catch (err) {
+            setError(err.response?.data?.error || 'Failed to create newsletter after payment')
+            setStep(STATES.PREVIEW)
+          }
         } else if (event.name === 'checkout.closed') {
-          setStep(STATES.PREVIEW)
+          if (step !== STATES.CREATING && step !== STATES.SUCCESS) {
+            setStep(STATES.PREVIEW)
+          }
         }
       }
     })

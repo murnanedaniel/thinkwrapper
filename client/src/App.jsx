@@ -33,7 +33,7 @@ function App() {
     // Load config and init Paddle, then check auth
     Promise.all([loadConfig(), refreshUser()])
       .then(([config]) => {
-        // Initialize Paddle.js if available
+        // Initialize Paddle.js (Billing v2)
         if (window.Paddle && config.paddle_client_token) {
           if (config.paddle_sandbox) {
             window.Paddle.Environment.set('sandbox')

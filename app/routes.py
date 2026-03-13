@@ -358,6 +358,37 @@ def paddle_webhook():
         return APIResponse.error('Webhook processing failed', status_code=500)
 
 
+@bp.route('/api/payment/activate-by-checkout', methods=['POST'])
+@require_json
+def activate_by_checkout():
+    """
+    Activate a user's subscription based on a completed Paddle checkout event.
+    Called from the frontend after checkout.completed fires.
+    This is needed because the Paddle webhook may not have reached the server yet.
+    """
+    if not current_user.is_authenticated:
+        return APIResponse.error('Authentication required', status_code=401)
+
+    data = request.json
+    transaction_id = data.get('transaction_id')
+    customer_id = data.get('customer_id')
+
+    db = get_db()
+    from .models import User
+    user = db.query(User).filter_by(id=current_user.id).first()
+    if not user:
+        return APIResponse.error('User not found', status_code=404)
+
+    # Activate the subscription based on the checkout event
+    user.subscription_status = 'active'
+    if customer_id and not user.paddle_customer_id:
+        user.paddle_customer_id = customer_id
+    db.commit()
+
+    current_app.logger.info(f"Subscription activated via checkout for {user.email} (txn: {transaction_id})")
+    return APIResponse.success(data={'subscription_status': 'active'})
+
+
 @bp.route('/api/payment/subscription/<subscription_id>/cancel', methods=['POST'])
 def cancel_subscription(subscription_id):
     from .payment_service import get_paddle_service
@@ -377,6 +408,8 @@ def get_frontend_config():
     return APIResponse.success(data={
         'paddle_client_token': os.environ.get('PADDLE_CLIENT_TOKEN', ''),
         'paddle_price_id': os.environ.get('PADDLE_PRICE_ID', ''),
+        'paddle_vendor_id': os.environ.get('PADDLE_VENDOR_ID', ''),
+        'paddle_product_id': os.environ.get('PADDLE_PRODUCT_ID', ''),
         'paddle_sandbox': os.environ.get('PADDLE_SANDBOX', 'true').lower() == 'true',
     })
 
