@@ -27,8 +27,15 @@ function CreateNewsletter({ isLoggedIn, user, paddleReady, refreshUser }) {
   const [error, setError] = useState(null)
   const [result, setResult] = useState(null)
   const [taskId, setTaskId] = useState(null)
-  const [progressMsg, setProgressMsg] = useState('')
-  const [progressLog, setProgressLog] = useState([])
+  const [stages, setStages] = useState({ searching: [], reading: [], writing: [] })
+  const [activeStage, setActiveStage] = useState(null) // 'searching' | 'reading' | 'writing' | 'done'
+
+  const classifyMessage = (status) => {
+    if (status.startsWith('Searching:')) return { stage: 'searching', detail: status.slice(10).trim() }
+    if (status.startsWith('Reading article:')) return { stage: 'reading', detail: status.slice(16).trim() }
+    if (status.startsWith('Writing')) return { stage: 'writing', detail: null }
+    return null
+  }
 
   // Poll task progress when generating
   useEffect(() => {
@@ -38,18 +45,20 @@ function CreateNewsletter({ isLoggedIn, user, paddleReady, refreshUser }) {
         const res = await axios.get(`/api/task/${taskId}`)
         const { state, status, result: taskResult } = res.data
         if (state === 'PROGRESS' && status) {
-          setProgressMsg(status)
-          // Only show user-meaningful messages in the log
-          const skip = ['Starting newsletter', 'Mode:', 'Orchestrator', 'Timestamp:', '✓ Complete']
-          const isNoise = skip.some(s => status.startsWith(s))
-          if (!isNoise) {
-            setProgressLog(log => {
-              if (log.length > 0 && log[log.length - 1] === status) return log
-              return [...log.slice(-7), status]
-            })
+          const classified = classifyMessage(status)
+          if (classified) {
+            setActiveStage(classified.stage)
+            if (classified.detail) {
+              setStages(s => {
+                const prev = s[classified.stage]
+                if (prev[prev.length - 1] === classified.detail) return s
+                return { ...s, [classified.stage]: [...prev, classified.detail] }
+              })
+            }
           }
         } else if (state === 'SUCCESS' && taskResult) {
           clearInterval(poll)
+          setActiveStage('done')
           setPreview(taskResult)
           setStep(STATES.PREVIEW)
           setTaskId(null)
@@ -85,8 +94,8 @@ function CreateNewsletter({ isLoggedIn, user, paddleReady, refreshUser }) {
     e.preventDefault()
     setStep(STATES.GENERATING)
     setError(null)
-    setProgressMsg('')
-    setProgressLog([])
+    setStages({ searching: [], reading: [], writing: [] })
+    setActiveStage(null)
 
     try {
       const response = await axios.post('/api/newsletter/preview', {
@@ -310,20 +319,49 @@ function CreateNewsletter({ isLoggedIn, user, paddleReady, refreshUser }) {
       )}
 
       {step === STATES.GENERATING && taskId && (
-        <div style={{ marginTop: '1.5rem', padding: '1.5rem', background: '#f8f9fa', borderRadius: '8px', border: '1px solid #e0e0e0' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-            <div style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid #4a90e2', borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite' }} />
-            <strong style={{ color: '#333' }}>Generating your newsletter…</strong>
+        <div style={{ marginTop: '1.5rem' }}>
+          <style>{`
+            @keyframes spin { to { transform: rotate(360deg); } }
+            .stage-card { border: 1px solid #e0e0e0; borderRadius: 8px; padding: 1rem 1.25rem; background: #fff; transition: all 0.3s; }
+          `}</style>
+          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+            {[
+              { key: 'searching', icon: '🔍', label: 'Searching' },
+              { key: 'reading',   icon: '📖', label: 'Reading' },
+              { key: 'writing',   icon: '✍️',  label: 'Writing' },
+            ].map(({ key, icon, label }) => {
+              const isActive = activeStage === key
+              const isDone = activeStage !== null && ['searching','reading','writing','done'].indexOf(activeStage) > ['searching','reading','writing','done'].indexOf(key)
+              const isPending = !isActive && !isDone
+              const details = stages[key]
+              return (
+                <div key={key} style={{
+                  flex: '1 1 180px', border: `1px solid ${isActive ? '#4a90e2' : isDone ? '#4caf50' : '#e0e0e0'}`,
+                  borderRadius: 8, padding: '1rem 1.25rem', background: isActive ? '#f0f7ff' : isDone ? '#f0fff4' : '#fafafa',
+                  transition: 'all 0.3s',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: details.length ? '0.75rem' : 0 }}>
+                    <span style={{ fontSize: '1.3rem' }}>{isDone ? '✅' : icon}</span>
+                    <strong style={{ color: isPending ? '#aaa' : '#333' }}>{label}</strong>
+                    {isActive && <div style={{ marginLeft: 'auto', width: 12, height: 12, borderRadius: '50%', border: '2px solid #4a90e2', borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite' }} />}
+                  </div>
+                  {details.length > 0 && (
+                    <div style={{ fontSize: '0.78rem', color: '#555', lineHeight: 1.5 }}>
+                      {details.map((d, i) => (
+                        <div key={i} style={{ opacity: i === details.length - 1 && isActive ? 1 : 0.6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {d}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {key === 'writing' && isActive && (
+                    <div style={{ fontSize: '0.78rem', color: '#555' }}>Composing your newsletter…</div>
+                  )}
+                  {isPending && <div style={{ fontSize: '0.78rem', color: '#bbb' }}>Waiting…</div>}
+                </div>
+              )
+            })}
           </div>
-          <div style={{ fontFamily: 'monospace', fontSize: '0.85rem', color: '#555' }}>
-            {progressLog.map((msg, i) => (
-              <div key={i} style={{ padding: '0.2rem 0', opacity: i === progressLog.length - 1 ? 1 : 0.45 }}>
-                {i === progressLog.length - 1 ? '▶ ' : '✓ '}{msg}
-              </div>
-            ))}
-            {progressLog.length === 0 && <div style={{ color: '#aaa' }}>Starting agent…</div>}
-          </div>
-          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </div>
       )}
 

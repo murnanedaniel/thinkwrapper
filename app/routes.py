@@ -351,7 +351,6 @@ def paddle_webhook():
 
 
 @bp.route('/api/payment/activate-by-checkout', methods=['POST'])
-@require_json
 def activate_by_checkout():
     """
     Activate a user's subscription based on a completed Paddle checkout event.
@@ -361,7 +360,7 @@ def activate_by_checkout():
     if not current_user.is_authenticated:
         return APIResponse.error('Authentication required', status_code=401)
 
-    data = request.json
+    data = request.json or {}
     transaction_id = data.get('transaction_id')
     customer_id = data.get('customer_id')
 
