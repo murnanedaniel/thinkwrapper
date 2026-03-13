@@ -26,6 +26,35 @@ function CreateNewsletter({ isLoggedIn, user, paddleReady, refreshUser }) {
   const [preview, setPreview] = useState(null)
   const [error, setError] = useState(null)
   const [result, setResult] = useState(null)
+  const [taskId, setTaskId] = useState(null)
+  const [progressMsg, setProgressMsg] = useState('')
+  const [progressLog, setProgressLog] = useState([])
+
+  // Poll task progress when generating
+  useEffect(() => {
+    if (!taskId || step !== STATES.GENERATING) return
+    const poll = setInterval(async () => {
+      try {
+        const res = await axios.get(`/api/task/${taskId}`)
+        const { state, status, result: taskResult } = res.data
+        if (state === 'PROGRESS' && status) {
+          setProgressMsg(status)
+          setProgressLog(log => [...log.slice(-6), status])
+        } else if (state === 'SUCCESS' && taskResult) {
+          clearInterval(poll)
+          setPreview(taskResult)
+          setStep(STATES.PREVIEW)
+          setTaskId(null)
+        } else if (state === 'FAILURE') {
+          clearInterval(poll)
+          setError(status || 'Generation failed')
+          setStep(STATES.INPUT)
+          setTaskId(null)
+        }
+      } catch (_) {}
+    }, 2000)
+    return () => clearInterval(poll)
+  }, [taskId, step])
 
   // Restore state after OAuth redirect
   useEffect(() => {
@@ -48,6 +77,8 @@ function CreateNewsletter({ isLoggedIn, user, paddleReady, refreshUser }) {
     e.preventDefault()
     setStep(STATES.GENERATING)
     setError(null)
+    setProgressMsg('')
+    setProgressLog([])
 
     try {
       const response = await axios.post('/api/newsletter/preview', {
@@ -55,9 +86,9 @@ function CreateNewsletter({ isLoggedIn, user, paddleReady, refreshUser }) {
         description: formData.description,
         style: formData.style,
       })
-      if (response.data.success) {
-        setPreview(response.data.data)
-        setStep(STATES.PREVIEW)
+      if (response.data.success && response.data.data?.task_id) {
+        setTaskId(response.data.data.task_id)
+        setProgressMsg('Starting...')
       } else {
         setError(response.data.error || 'Generation failed')
         setStep(STATES.INPUT)
@@ -265,15 +296,33 @@ function CreateNewsletter({ isLoggedIn, user, paddleReady, refreshUser }) {
             </div>
           </div>
           <button type="submit" className="btn btn-primary" disabled={step === STATES.GENERATING}>
-            {step === STATES.GENERATING ? 'Generating Preview...' : 'Generate Preview (Free)'}
+            {step === STATES.GENERATING ? 'Working...' : 'Generate Preview (Free)'}
           </button>
         </form>
+      )}
+
+      {step === STATES.GENERATING && taskId && (
+        <div style={{ marginTop: '1.5rem', padding: '1.5rem', background: '#f8f9fa', borderRadius: '8px', border: '1px solid #e0e0e0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+            <div style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid #4a90e2', borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite' }} />
+            <strong style={{ color: '#333' }}>Generating your newsletter…</strong>
+          </div>
+          <div style={{ fontFamily: 'monospace', fontSize: '0.85rem', color: '#555' }}>
+            {progressLog.map((msg, i) => (
+              <div key={i} style={{ padding: '0.2rem 0', opacity: i === progressLog.length - 1 ? 1 : 0.45 }}>
+                {i === progressLog.length - 1 ? '▶ ' : '✓ '}{msg}
+              </div>
+            ))}
+            {progressLog.length === 0 && <div style={{ color: '#aaa' }}>Starting agent…</div>}
+          </div>
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
       )}
 
       {step === STATES.PREVIEW && preview && (
         <div className="preview-section">
           <div style={{ marginBottom: '1rem', padding: '0.5rem 1rem', background: '#e8f4fd', borderRadius: '4px', fontSize: '0.9rem' }}>
-            Sources: {preview.search_source === 'brave' ? 'Real web articles' : 'Sample data'}
+            Sources: {preview.search_source === 'brave' || preview.search_source === 'agent' ? 'Real web articles' : 'Sample data'}
             {preview.articles?.length > 0 && ` (${preview.articles.length} articles)`}
           </div>
           <div

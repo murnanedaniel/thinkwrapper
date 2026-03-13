@@ -57,8 +57,8 @@ def index():
 @require_json
 def preview_newsletter_generate():
     """
-    Generate a newsletter preview. No auth required.
-    This is the "try before you buy" endpoint.
+    Start async newsletter preview generation. No auth required.
+    Returns a task_id — poll /api/task/<task_id> for progress and result.
     """
     data = request.json
     topic = InputValidator.sanitize_string(data.get('topic', ''))
@@ -73,45 +73,14 @@ def preview_newsletter_generate():
     if not is_valid:
         return APIResponse.error(error_msg)
 
-    # Build a richer topic prompt from topic + description
     full_topic = topic
     if description:
         full_topic = f"{topic}. Focus on: {description}"
 
-    # Generate using Claude + Brave Search (synchronous for preview)
-    result = claude_service.generate_newsletter_with_search(
-        topic=full_topic,
-        style=style,
-        max_tokens=2000,
-        search_count=10
-    )
+    from app.tasks import generate_newsletter_async
+    task = generate_newsletter_async.delay(full_topic, style, 'weekly')
 
-    if result is None:
-        # Fallback to Claude without search
-        result = claude_service.generate_newsletter_content_claude(
-            topic=full_topic, style=style, max_tokens=2000
-        )
-
-    if result is None:
-        return APIResponse.error(
-            'Failed to generate newsletter. Check API key configuration.',
-            status_code=500
-        )
-
-    # Render HTML preview
-    renderer = NewsletterRenderer()
-    html_preview = renderer.render_html({
-        'subject': result['subject'],
-        'content': result['content']
-    })
-
-    return APIResponse.success(data={
-        'subject': result['subject'],
-        'content': result['content'],
-        'html_preview': html_preview,
-        'articles': result.get('articles', []),
-        'search_source': result.get('search_source', 'none'),
-    })
+    return APIResponse.success(data={'task_id': task.id})
 
 
 # --- Newsletter CRUD (auth + subscription required) ---
@@ -236,12 +205,33 @@ def generate_newsletter():
 def get_task_status(task_id):
     from app.celery_config import celery
     task = celery.AsyncResult(task_id)
+
     if task.state == 'PENDING':
-        return jsonify({'state': task.state, 'status': 'Task is waiting to be processed'})
+        return jsonify({'state': 'PENDING', 'status': 'Waiting to start...'})
+    elif task.state == 'PROGRESS':
+        return jsonify({'state': 'PROGRESS', 'status': task.info.get('status', '')})
     elif task.state == 'FAILURE':
-        return jsonify({'state': task.state, 'status': str(task.info)})
+        return jsonify({'state': 'FAILURE', 'status': str(task.info)})
+    elif task.state == 'SUCCESS':
+        result = task.result or {}
+        # Render HTML preview from the completed task result
+        renderer = NewsletterRenderer()
+        html_preview = renderer.render_html({
+            'subject': result.get('subject', ''),
+            'content': result.get('content', '')
+        })
+        return jsonify({
+            'state': 'SUCCESS',
+            'result': {
+                'subject': result.get('subject', ''),
+                'content': result.get('content', ''),
+                'html_preview': html_preview,
+                'articles': result.get('articles', []),
+                'search_source': 'agent',
+            }
+        })
     else:
-        return jsonify({'state': task.state, 'result': task.result if task.state == 'SUCCESS' else None})
+        return jsonify({'state': task.state, 'status': str(task.info)})
 
 
 @bp.route('/api/claude/newsletter', methods=['POST'])
