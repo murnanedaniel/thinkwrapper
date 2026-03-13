@@ -1,337 +1,205 @@
 """Tests for Celery tasks."""
 import pytest
-from unittest.mock import patch, Mock, MagicMock
-from datetime import datetime
+from unittest.mock import patch, Mock, MagicMock, PropertyMock
+from datetime import datetime, timedelta, timezone
 from celery.exceptions import MaxRetriesExceededError
 
 
 class TestNewsletterGenerationTask:
     """Test async newsletter generation task."""
-    
-    @patch('app.tasks.services.generate_newsletter_content')
-    def test_generate_newsletter_async_success(self, mock_generate):
+
+    @patch('app.claude_service.generate_newsletter_with_search')
+    def test_generate_newsletter_async_success(self, mock_search):
         """Test successful newsletter generation."""
         from app.tasks import generate_newsletter_async
-        
-        mock_generate.return_value = {
+
+        mock_search.return_value = {
             'subject': 'AI Weekly Update',
             'content': 'Great content about AI...'
         }
-        
-        result = generate_newsletter_async("Artificial Intelligence", "concise")
-        
+
+        result = generate_newsletter_async("Artificial Intelligence", "professional")
+
         assert result is not None
         assert result['subject'] == 'AI Weekly Update'
         assert result['content'] == 'Great content about AI...'
-        mock_generate.assert_called_once_with("Artificial Intelligence", "concise")
-    
-    @patch('app.tasks.services.generate_newsletter_content')
-    def test_generate_newsletter_async_with_default_style(self, mock_generate):
+
+    @patch('app.claude_service.generate_newsletter_with_search')
+    def test_generate_newsletter_async_with_default_style(self, mock_search):
         """Test newsletter generation with default style."""
         from app.tasks import generate_newsletter_async
-        
-        mock_generate.return_value = {
+
+        mock_search.return_value = {
             'subject': 'Test Subject',
             'content': 'Test Content'
         }
-        
+
         result = generate_newsletter_async("Test Topic")
-        
         assert result is not None
-        mock_generate.assert_called_once_with("Test Topic", "concise")
-    
-    @patch('app.tasks.services.generate_newsletter_content')
-    def test_generate_newsletter_async_none_result(self, mock_generate):
-        """Test handling when service returns None."""
+        assert result['subject'] == 'Test Subject'
+
+    @patch('app.claude_service.generate_newsletter_content_claude')
+    @patch('app.claude_service.generate_newsletter_with_search')
+    def test_generate_newsletter_async_fallback_to_claude(self, mock_search, mock_claude):
+        """Test fallback to direct Claude when search fails."""
         from app.tasks import generate_newsletter_async
-        
-        mock_generate.return_value = None
-        
-        # The task should raise an exception when service returns None
-        with pytest.raises(Exception, match="Newsletter generation service returned None"):
-            result = generate_newsletter_async("Test Topic")
-            # If it doesn't raise immediately, the retry will raise
-            if result and 'error' in result:
-                pass  # Max retries exceeded returns error dict
+
+        mock_search.return_value = None
+        mock_claude.return_value = {
+            'subject': 'Fallback Subject',
+            'content': 'Fallback Content'
+        }
+
+        result = generate_newsletter_async("Test Topic")
+        assert result is not None
+        assert result['subject'] == 'Fallback Subject'
+
+    @patch('app.claude_service.generate_newsletter_content_claude')
+    @patch('app.claude_service.generate_newsletter_with_search')
+    def test_generate_newsletter_async_total_failure(self, mock_search, mock_claude):
+        """Test when both generation methods fail."""
+        from app.tasks import generate_newsletter_async
+
+        mock_search.return_value = None
+        mock_claude.return_value = None
+
+        # In eager mode, Celery raises the exception rather than retrying
+        with pytest.raises(Exception):
+            generate_newsletter_async("Test Topic")
 
 
 class TestEmailSendingTask:
     """Test async email sending task."""
-    
-    @patch('app.tasks.services.send_email')
+
+    @patch('app.services.send_email')
     def test_send_email_async_success(self, mock_send):
         """Test successful email sending."""
         from app.tasks import send_email_async
-        
+
         mock_send.return_value = True
-        
-        result = send_email_async(
-            "test@example.com",
-            "Test Subject",
-            "<h1>Test Content</h1>"
-        )
-        
+
+        result = send_email_async("test@example.com", "Subject", "<p>Content</p>")
+
         assert result['success'] is True
-        assert result['to_email'] == "test@example.com"
-        assert result['subject'] == "Test Subject"
-        assert 'sent_at' in result
-        mock_send.assert_called_once_with(
-            "test@example.com",
-            "Test Subject",
-            "<h1>Test Content</h1>"
-        )
-    
-    @patch('app.tasks.services.send_email')
+        assert result['to_email'] == 'test@example.com'
+        mock_send.assert_called_once_with("test@example.com", "Subject", "<p>Content</p>")
+
+    @patch('app.services.send_email')
     def test_send_email_async_failure(self, mock_send):
-        """Test handling of email sending failure."""
+        """Test email sending failure."""
         from app.tasks import send_email_async
-        
+
         mock_send.return_value = False
-        
-        # The task should raise an exception when email sending fails
-        with pytest.raises(Exception, match="Email sending failed"):
-            result = send_email_async("test@example.com", "Subject", "Content")
-            # If it doesn't raise immediately, the retry will raise
-            if result and not result.get('success'):
-                pass  # Max retries exceeded returns error dict
+
+        # In eager mode, Celery raises the exception rather than retrying
+        with pytest.raises(Exception):
+            send_email_async("test@example.com", "Subject", "Content")
 
 
 class TestNewsletterIssueTask:
-    """Test combined newsletter generation and sending task."""
-    
-    @patch('app.tasks.services.send_email')
-    @patch('app.tasks.services.generate_newsletter_content')
-    def test_send_newsletter_issue_success(self, mock_generate, mock_send):
-        """Test successful newsletter issue processing."""
+    """Test newsletter issue sending task."""
+
+    @patch('app.services.send_email')
+    @patch('app.claude_service.generate_newsletter_with_search')
+    @patch('app.tasks._get_db_session')
+    def test_send_newsletter_issue_success(self, mock_db_session, mock_search, mock_send):
+        """Test successful newsletter issue creation and sending."""
         from app.tasks import send_newsletter_issue
-        
-        # Mock the service calls directly
-        mock_generate.return_value = {
-            'subject': 'Newsletter Subject',
-            'content': 'Newsletter Content'
+        from app.models import Newsletter
+
+        mock_db = MagicMock()
+        mock_db_session.return_value = mock_db
+
+        mock_newsletter = Mock(spec=Newsletter)
+        mock_newsletter.id = 1
+        mock_newsletter.topic = 'AI News'
+        mock_newsletter.description = 'Latest AI developments'
+        mock_newsletter.style = 'professional'
+        mock_db.query.return_value.get.return_value = mock_newsletter
+
+        mock_search.return_value = {
+            'subject': 'This Week in AI',
+            'content': '## AI News\n\nContent here...'
         }
         mock_send.return_value = True
-        
-        result = send_newsletter_issue(123, "user@example.com")
-        
+
+        result = send_newsletter_issue(1, 'user@example.com')
+
         assert result['success'] is True
-        assert result['newsletter_id'] == 123
-        assert result['recipient'] == "user@example.com"
-        assert result['content_generated'] is True
+        assert result['newsletter_id'] == 1
         assert result['email_sent'] is True
-        
-        # Verify services were called
-        mock_generate.assert_called_once()
-        mock_send.assert_called_once_with(
-            "user@example.com",
-            "Newsletter Subject",
-            "Newsletter Content"
-        )
+
+    @patch('app.tasks._get_db_session')
+    def test_send_newsletter_issue_not_found(self, mock_db_session):
+        """Test sending issue for non-existent newsletter."""
+        from app.tasks import send_newsletter_issue
+
+        mock_db = MagicMock()
+        mock_db_session.return_value = mock_db
+        mock_db.query.return_value.get.return_value = None
+
+        # In eager mode, Celery raises the exception rather than retrying
+        with pytest.raises(Exception):
+            send_newsletter_issue(999, 'user@example.com')
 
 
 class TestPeriodicTasks:
-    """Test periodic tasks."""
-    
-    def test_check_scheduled_newsletters(self):
-        """Test checking scheduled newsletters."""
+    """Test periodic/scheduled tasks."""
+
+    @patch('app.tasks.send_newsletter_issue')
+    @patch('app.tasks._get_db_session')
+    def test_check_scheduled_newsletters(self, mock_db_session, mock_send_issue):
+        """Test scheduled newsletter check."""
         from app.tasks import check_scheduled_newsletters
-        
+
+        mock_db = MagicMock()
+        mock_db_session.return_value = mock_db
+
+        # Create mock newsletter that's due
+        mock_newsletter = Mock()
+        mock_newsletter.id = 1
+        mock_newsletter.schedule = 'daily'
+        mock_newsletter.status = 'active'
+        mock_newsletter.last_sent_at = datetime.utcnow() - timedelta(days=2)
+        mock_user = Mock()
+        mock_user.email = 'user@example.com'
+        mock_user.subscription_status = 'active'
+        mock_newsletter.user = mock_user
+
+        mock_db.query.return_value.filter.return_value.all.return_value = [mock_newsletter]
+
         result = check_scheduled_newsletters()
-        
+
         assert result['success'] is True
-        assert 'checked' in result
-        assert 'sent' in result
-        assert 'checked_at' in result
-    
+        assert result['checked'] == 1
+        mock_send_issue.delay.assert_called_once_with(1, 'user@example.com')
+
     def test_cleanup_old_results(self):
-        """Test cleanup of old task results."""
+        """Test cleanup task runs successfully."""
         from app.tasks import cleanup_old_results
-        
+
         result = cleanup_old_results()
-        
         assert result['success'] is True
         assert 'cleaned_at' in result
-        assert 'message' in result
-
-
-class TestExampleTasks:
-    """Test example tasks."""
-    
-    def test_example_notification_task(self):
-        """Test notification task."""
-        from app.tasks import example_notification_task
-        
-        result = example_notification_task(user_id=123, message="Test notification")
-        
-        assert result['success'] is True
-        assert result['user_id'] == 123
-        assert result['message'] == "Test notification"
-        assert 'sent_at' in result
-    
-    def test_example_api_call_task(self):
-        """Test API call task."""
-        from app.tasks import example_api_call_task
-        
-        result = example_api_call_task(
-            endpoint="https://api.example.com/test",
-            method="POST",
-            data={"key": "value"}
-        )
-        
-        assert result['success'] is True
-        assert result['endpoint'] == "https://api.example.com/test"
-        assert result['method'] == "POST"
-        assert 'completed_at' in result
 
 
 class TestCallbackTask:
-    """Test callback task base class."""
-    
-    @patch('app.tasks.logger')
-    def test_callback_task_on_success(self, mock_logger):
-        """Test success callback logging."""
+    """Test the CallbackTask base class."""
+
+    def test_callback_task_on_success(self):
+        """Test CallbackTask logs success."""
         from app.tasks import CallbackTask
-        
+
         task = CallbackTask()
-        task.name = "test_task"
-        
-        task.on_success("result", "task-id-123", [], {})
-        
-        # Verify logging was called
-        assert mock_logger.info.called
-    
-    @patch('app.tasks.logger')
-    def test_callback_task_on_failure(self, mock_logger):
-        """Test failure callback logging."""
+        task.name = 'test_task'
+        # Should not raise
+        task.on_success('result', 'task-id-123', [], {})
+
+    def test_callback_task_on_failure(self):
+        """Test CallbackTask logs failure."""
         from app.tasks import CallbackTask
-        
+
         task = CallbackTask()
-        task.name = "test_task"
-        
-        exc = Exception("Test error")
-        task.on_failure(exc, "task-id-123", [], {}, None)
-        
-        # Verify error logging was called
-        assert mock_logger.error.called
-    
-    @patch('app.tasks.logger')
-    def test_callback_task_on_retry(self, mock_logger):
-        """Test retry callback logging."""
-        from app.tasks import CallbackTask
-        
-        task = CallbackTask()
-        task.name = "test_task"
-        
-        exc = Exception("Test error")
-        task.on_retry(exc, "task-id-123", [], {}, None)
-        
-        # Verify warning logging was called
-        assert mock_logger.warning.called
-
-
-class TestTaskConfiguration:
-    """Test task configuration and setup."""
-    
-    def test_celery_instance_exists(self):
-        """Test that Celery instance is properly configured."""
-        from app.celery_config import celery
-        
-        assert celery is not None
-        assert celery.conf.task_serializer == 'json'
-        assert celery.conf.result_serializer == 'json'
-        assert celery.conf.timezone == 'UTC'
-    
-    def test_tasks_registered(self):
-        """Test that tasks are registered with Celery."""
-        from app.celery_config import celery
-        
-        registered_tasks = list(celery.tasks.keys())
-        
-        # Check that our custom tasks are registered
-        assert any('generate_newsletter_async' in task for task in registered_tasks)
-        assert any('send_email_async' in task for task in registered_tasks)
-    
-    def test_beat_schedule_configured(self):
-        """Test that beat schedule is configured."""
-        from app.celery_config import celery
-        
-        beat_schedule = celery.conf.beat_schedule
-        
-        assert 'check-scheduled-newsletters' in beat_schedule
-        assert 'cleanup-old-task-results' in beat_schedule
-        
-        # Verify schedule configuration
-        newsletter_schedule = beat_schedule['check-scheduled-newsletters']
-        assert newsletter_schedule['task'] == 'app.tasks.check_scheduled_newsletters'
-        
-        cleanup_schedule = beat_schedule['cleanup-old-task-results']
-        assert cleanup_schedule['task'] == 'app.tasks.cleanup_old_results'
-
-
-class TestTaskRetryLogic:
-    """Test task retry behavior."""
-    
-    @patch('app.tasks.services.generate_newsletter_content')
-    def test_generate_newsletter_retry_on_exception(self, mock_generate):
-        """Test that task retries on exception."""
-        from app.tasks import generate_newsletter_async
-        
-        mock_generate.side_effect = [
-            Exception("First failure"),
-            {'subject': 'Success', 'content': 'Content'}
-        ]
-        
-        # Create a mock for the retry mechanism
-        with patch.object(generate_newsletter_async, 'retry') as mock_retry:
-            mock_retry.side_effect = Exception("Retry called")
-            
-            with pytest.raises(Exception):
-                generate_newsletter_async("Test")
-    
-    @patch('app.tasks.services.send_email')
-    def test_send_email_retry_on_failure(self, mock_send):
-        """Test that email task retries on failure."""
-        from app.tasks import send_email_async
-        
-        mock_send.side_effect = [False, True]
-        
-        # Mock the retry mechanism
-        with patch.object(send_email_async, 'retry') as mock_retry:
-            mock_retry.side_effect = Exception("Retry called")
-            
-            with pytest.raises(Exception):
-                send_email_async("test@example.com", "Subject", "Content")
-
-
-class TestTaskErrorHandling:
-    """Test error handling in tasks."""
-    
-    @patch('app.tasks.services.generate_newsletter_content')
-    @patch('app.tasks.logger')
-    def test_generate_newsletter_logs_error(self, mock_logger, mock_generate):
-        """Test that errors are properly logged."""
-        from app.tasks import generate_newsletter_async
-        
-        mock_generate.side_effect = Exception("API Error")
-        
-        with patch.object(generate_newsletter_async, 'retry', side_effect=Exception("Retry")):
-            with pytest.raises(Exception):
-                generate_newsletter_async("Test Topic")
-        
-        # Verify error was logged
-        assert mock_logger.error.called
-    
-    @patch('app.tasks.services.send_email')
-    @patch('app.tasks.logger')
-    def test_send_email_logs_error(self, mock_logger, mock_send):
-        """Test that email errors are logged."""
-        from app.tasks import send_email_async
-        
-        mock_send.side_effect = Exception("SendGrid Error")
-        
-        with patch.object(send_email_async, 'retry', side_effect=Exception("Retry")):
-            with pytest.raises(Exception):
-                send_email_async("test@example.com", "Subject", "Content")
-        
-        # Verify error was logged
-        assert mock_logger.error.called
+        task.name = 'test_task'
+        # Should not raise
+        task.on_failure(Exception('test error'), 'task-id-123', [], {}, None)

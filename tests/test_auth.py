@@ -107,6 +107,7 @@ def test_get_user_authenticated(client):
         mock_user.email = 'test@example.com'
         mock_user.name = 'Test User'
         mock_user.id = 1
+        mock_user.subscription_status = 'active'
         
         response = client.get('/api/auth/user')
         

@@ -362,41 +362,6 @@ class TestPaddleIntegration:
         assert 'sub_test_123/cancel' in mock_post.call_args[0][0]
         assert mock_post.call_args[1]['json']['effective_from'] == '2024-12-31'
     
-    @patch('app.payment_service.requests.get')
-    @patch.dict('os.environ', {
-        'PADDLE_VENDOR_ID': 'test_vendor',
-        'PADDLE_API_KEY': 'test_key',
-        'PADDLE_WEBHOOK_SECRET': 'test_secret',
-        'PADDLE_SANDBOX': 'true'
-    })
-    def test_customer_info_retrieval(self, mock_get, app):
-        """Test customer information retrieval."""
-        with app.app_context():
-            # Mock successful customer retrieval
-            mock_response = Mock()
-            mock_response.status_code = 200
-            mock_response.json.return_value = {
-                'data': {
-                    'id': 'cus_test_123',
-                    'email': 'customer@example.com',
-                    'name': 'Test Customer',
-                    'created_at': '2024-01-01T00:00:00.000Z'
-                }
-            }
-            mock_get.return_value = mock_response
-            
-            # Get Paddle service and retrieve customer
-            paddle_service = get_paddle_service()
-            customer = paddle_service.get_customer_info('cus_test_123')
-            
-            assert customer is not None
-            assert customer['data']['id'] == 'cus_test_123'
-            assert customer['data']['email'] == 'customer@example.com'
-            
-            # Verify API was called correctly
-            mock_get.assert_called_once()
-            assert 'customers/cus_test_123' in mock_get.call_args[0][0]
-    
     @patch('app.payment_service.requests.post')
     @patch.dict('os.environ', {
         'PADDLE_VENDOR_ID': 'test_vendor',

@@ -34,7 +34,10 @@ class Newsletter(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     name = Column(String(100), nullable=False)
     topic = Column(String(100), nullable=False)
-    schedule = Column(String(50), nullable=True)  # cron expression
+    description = Column(Text, nullable=True)
+    style = Column(String(50), default="professional")
+    status = Column(String(50), default="active")  # active, paused, cancelled
+    schedule = Column(String(50), nullable=True)  # daily, weekly, biweekly, monthly
     last_sent_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
