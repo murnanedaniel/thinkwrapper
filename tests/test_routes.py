@@ -18,7 +18,7 @@ def test_health_check(client):
     assert response.json == {"status": "ok"}
 
 
-@patch('app.routes.generate_newsletter_async')
+@patch('app.tasks.generate_newsletter_async')
 def test_generate_newsletter(mock_task, client):
     """Test the newsletter generation endpoint."""
     # Mock the Celery task
@@ -39,7 +39,7 @@ def test_generate_newsletter(mock_task, client):
     mock_task.delay.assert_called_once_with('Artificial Intelligence', 'professional')
 
 
-@patch('app.routes.generate_newsletter_async')
+@patch('app.tasks.generate_newsletter_async')
 def test_generate_newsletter_default_style(mock_task, client):
     """Test newsletter generation with default style."""
     mock_result = Mock()

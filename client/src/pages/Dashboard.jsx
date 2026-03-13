@@ -1,128 +1,96 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import axios from 'axios'
-import NewsletterGenerator from '../components/NewsletterGenerator'
 
-function Dashboard() {
+function Dashboard({ isLoggedIn, user }) {
   const [newsletters, setNewsletters] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [generatingNewsletter, setGeneratingNewsletter] = useState(null)
-  const [userEmail, setUserEmail] = useState('murnane2@gmail.com') // Default fallback
+  const navigate = useNavigate()
 
   useEffect(() => {
-    // Fetch authenticated user's email
-    async function fetchUser() {
-      try {
-        const response = await axios.get('/api/auth/user')
-        if (response.data.authenticated && response.data.email) {
-          setUserEmail(response.data.email)
-        }
-      } catch (err) {
-        console.error('Failed to fetch user email:', err)
-      }
+    if (!isLoggedIn) {
+      setIsLoading(false)
+      return
     }
-    fetchUser()
-  }, [])
 
-  useEffect(() => {
     async function fetchNewsletters() {
       try {
         const response = await axios.get('/api/newsletters')
         if (response.data.success) {
-          setNewsletters(response.data.newsletters.map(nl => ({
-            id: nl.id,
-            name: nl.name,
-            topic: nl.topic,
-            schedule: nl.schedule,
-            style: 'professional', // Default style for existing newsletters
-            lastSent: nl.last_sent_at ? new Date(nl.last_sent_at).toISOString().split('T')[0] : null,
-            issueCount: nl.issue_count
-          })))
+          setNewsletters(response.data.data)
+        } else {
+          setError('Failed to load newsletters')
         }
       } catch (err) {
-        setError('Failed to load newsletters')
+        if (err.response?.status === 401) {
+          setError('Please log in to view your newsletters')
+        } else {
+          setError('Failed to load newsletters')
+        }
       } finally {
         setIsLoading(false)
       }
     }
     fetchNewsletters()
-  }, [])
+  }, [isLoggedIn])
 
-  const handleGenerateNow = (newsletter) => {
-    setGeneratingNewsletter(newsletter)
-  }
-
-  const handleCloseGenerator = () => {
-    setGeneratingNewsletter(null)
+  if (!isLoggedIn) {
+    return (
+      <div className="dashboard container" style={{ textAlign: 'center', padding: '3rem' }}>
+        <h1>Your Newsletters</h1>
+        <p>Please log in to view your newsletters.</p>
+        <Link to="/login" className="btn btn-primary">Log In</Link>
+      </div>
+    )
   }
 
   if (isLoading) return <div className="loading">Loading your newsletters...</div>
-  if (error) return <div className="error-message">{error}</div>
+  if (error) return <div className="error container">{error}</div>
 
   return (
-    <>
-      <div className="dashboard container">
-        <div className="dashboard-header">
-          <h1>Your Newsletters</h1>
-          <Link to="/create" className="btn btn-primary">
-            Create New
-          </Link>
-        </div>
-
-        {newsletters.length === 0 ? (
-          <div className="empty-state">
-            <p>You don't have any newsletters yet.</p>
-            <Link to="/create" className="btn btn-primary">
-              Create Your First Newsletter
-            </Link>
-          </div>
-        ) : (
-          <div className="newsletters-grid">
-            {newsletters.map(newsletter => (
-              <div key={newsletter.id} className="newsletter-card">
-                <h2>{newsletter.name}</h2>
-                <p className="newsletter-topic">{newsletter.topic}</p>
-                <div className="newsletter-meta">
-                  <span className="meta-item">
-                    <strong>Schedule:</strong> {newsletter.schedule}
-                  </span>
-                  <span className="meta-item">
-                    <strong>Issues:</strong> {newsletter.issueCount}
-                  </span>
-                  {newsletter.lastSent && (
-                    <span className="meta-item">
-                      <strong>Last sent:</strong> {newsletter.lastSent}
-                    </span>
-                  )}
-                </div>
-                <div className="card-actions">
-                  <button 
-                    className="btn btn-primary"
-                    onClick={() => handleGenerateNow(newsletter)}
-                    disabled={generatingNewsletter && generatingNewsletter.id === newsletter.id}
-                  >
-                    {generatingNewsletter && generatingNewsletter.id === newsletter.id ? 'Generating...' : 'Generate Now'}
-                  </button>
-                  <Link to={`/newsletter/${newsletter.id}/edit`} className="btn btn-outline">
-                    Edit
-                  </Link>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+    <div className="dashboard container">
+      <div className="dashboard-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '2rem 0' }}>
+        <h1>Your Newsletters</h1>
+        <Link to="/create" className="btn btn-primary">Create New</Link>
       </div>
 
-      {generatingNewsletter && (
-        <NewsletterGenerator
-          newsletter={generatingNewsletter}
-          onClose={handleCloseGenerator}
-          userEmail={userEmail}
-        />
+      {user && (
+        <div style={{ marginBottom: '1rem', padding: '0.75rem 1rem', background: '#f0f0f0', borderRadius: '4px', fontSize: '0.9rem' }}>
+          Subscription: <strong>{user.subscription_status || 'None'}</strong>
+          {user.has_subscription && ' — Active'}
+        </div>
       )}
-    </>
+
+      {newsletters.length === 0 ? (
+        <div className="empty-state" style={{ textAlign: 'center', padding: '3rem' }}>
+          <p>You don&apos;t have any newsletters yet.</p>
+          <Link to="/create" className="btn btn-primary">Create Your First Newsletter</Link>
+        </div>
+      ) : (
+        <div className="newsletters-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
+          {newsletters.map(newsletter => (
+            <div key={newsletter.id} className="newsletter-card" style={{ background: 'white', padding: '1.5rem', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.12)' }}>
+              <h2 style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>{newsletter.name}</h2>
+              <p style={{ color: '#666' }}>Topic: {newsletter.topic}</p>
+              <p>Schedule: {newsletter.schedule}</p>
+              <p>Issues sent: {newsletter.issue_count}</p>
+              {newsletter.last_sent_at && <p>Last sent: {new Date(newsletter.last_sent_at).toLocaleDateString()}</p>}
+              <div style={{ marginTop: '1rem' }}>
+                <span style={{
+                  padding: '0.25rem 0.75rem', borderRadius: '12px', fontSize: '0.8rem',
+                  background: newsletter.status === 'active' ? '#e8f5e9' : '#fff3e0',
+                  color: newsletter.status === 'active' ? '#2e7d32' : '#e65100',
+                }}>
+                  {newsletter.status}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 
-export default Dashboard 
+export default Dashboard

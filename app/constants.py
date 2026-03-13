@@ -34,7 +34,7 @@ VALID_DELIVERY_FORMATS = ['html', 'text', 'both']
 VALID_STYLES = ['professional', 'casual', 'technical']
 
 # Email settings
-DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "murnanedaniel@hotmail.com")
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "newsletter@thinkwrapper.com")
 
 # Retry settings
 DEFAULT_RETRY_DELAY = 60
