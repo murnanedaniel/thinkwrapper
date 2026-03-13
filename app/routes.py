@@ -1,3 +1,5 @@
+import os
+
 from flask import (
     Blueprint, jsonify, request, current_app, send_from_directory,
 )
@@ -422,5 +424,3 @@ def catch_all(path):
     except Exception:
         return send_from_directory(current_app.static_folder, "index.html")
 
-
-import os

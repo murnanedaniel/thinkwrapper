@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { getConfig } from '../config'
@@ -26,6 +26,19 @@ function CreateNewsletter({ isLoggedIn, user, paddleReady, refreshUser }) {
   const [preview, setPreview] = useState(null)
   const [error, setError] = useState(null)
   const [result, setResult] = useState(null)
+
+  // Restore state after OAuth redirect
+  useEffect(() => {
+    const saved = localStorage.getItem('create_newsletter_draft')
+    if (saved) {
+      try {
+        const { formData: savedForm, preview: savedPreview } = JSON.parse(saved)
+        if (savedForm) setFormData(savedForm)
+        if (savedPreview) { setPreview(savedPreview); setStep(STATES.PREVIEW) }
+      } catch (_) {}
+      localStorage.removeItem('create_newsletter_draft')
+    }
+  }, [])
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
@@ -169,6 +182,7 @@ function CreateNewsletter({ isLoggedIn, user, paddleReady, refreshUser }) {
   }
 
   const handleLogin = () => {
+    localStorage.setItem('create_newsletter_draft', JSON.stringify({ formData, preview }))
     window.location.href = '/api/auth/login?next=/create'
   }
 

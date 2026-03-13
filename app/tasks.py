@@ -34,19 +34,20 @@ def _get_db_session():
 
 
 @celery.task(base=CallbackTask, bind=True, max_retries=3, default_retry_delay=60)
-def generate_newsletter_async(self, topic, style="concise"):
-    """Generate newsletter content asynchronously using Claude."""
+def generate_newsletter_async(self, topic, style="concise", schedule="weekly", debug_mode=False):
+    """Generate newsletter content asynchronously using Claude Agent SDK."""
     try:
         logger.info(f"Starting newsletter generation for topic: {topic}")
-        from app import claude_service
 
-        result = claude_service.generate_newsletter_with_search(
-            topic=topic, style=style, max_tokens=2000, search_count=10
+        def progress_callback(message):
+            self.update_state(state='PROGRESS', meta={'status': str(message)})
+            logger.info(f"[Progress] {message}")
+
+        from app.agent_service import generate_newsletter_sync
+        result = generate_newsletter_sync(
+            topic=topic, schedule=schedule, style=style,
+            debug_mode=debug_mode, progress_callback=progress_callback
         )
-        if result is None:
-            result = claude_service.generate_newsletter_content_claude(
-                topic=topic, style=style, max_tokens=2000
-            )
         if result is None:
             raise Exception(f"Newsletter generation failed for topic '{topic}'")
 
@@ -84,7 +85,6 @@ def send_newsletter_issue(self, newsletter_id, recipient_email):
     try:
         from app.models import Newsletter, Issue
         from app.newsletter_synthesis import NewsletterRenderer
-        from app import claude_service
         from app.services import send_email
 
         db = _get_db_session()
@@ -96,13 +96,11 @@ def send_newsletter_issue(self, newsletter_id, recipient_email):
         if newsletter.description:
             full_topic = f"{newsletter.topic}. Focus on: {newsletter.description}"
 
-        result = claude_service.generate_newsletter_with_search(
-            topic=full_topic, style=newsletter.style or 'professional', max_tokens=2000
+        from app.agent_service import generate_newsletter_sync
+        result = generate_newsletter_sync(
+            topic=full_topic, schedule=newsletter.schedule or 'weekly',
+            style=newsletter.style or 'professional'
         )
-        if result is None:
-            result = claude_service.generate_newsletter_content_claude(
-                topic=full_topic, style=newsletter.style or 'professional', max_tokens=2000
-            )
         if result is None:
             raise Exception(f"Content generation failed for newsletter {newsletter_id}")
 
