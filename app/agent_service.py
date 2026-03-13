@@ -41,16 +41,15 @@ class NewsletterAgentService:
         """
         if self.debug_mode:
             return {
-                "orchestrator": "claude-3-5-haiku-20241022",
-                "researcher": "claude-3-5-haiku-20241022",
-                "writer": "claude-3-5-haiku-20241022"
+                "orchestrator": "claude-haiku-4-5-20251001",
+                "researcher": "claude-haiku-4-5-20251001",
+                "writer": "claude-haiku-4-5-20251001",
             }
-        
-        # Production: Opus orchestrates, Sonnet does the work
+
         return {
-            "orchestrator": "claude-3-5-sonnet-20241022",  # Sonnet for orchestration
-            "researcher": "claude-3-5-sonnet-20241022",    # Sonnet for research
-            "writer": "claude-3-5-sonnet-20241022"         # Sonnet for writing
+            "orchestrator": "claude-sonnet-4-6",
+            "researcher": "claude-sonnet-4-6",
+            "writer": "claude-sonnet-4-6",
         }
     
     def _create_subagents(self) -> Dict[str, AgentDefinition]:
@@ -154,47 +153,33 @@ class NewsletterAgentService:
             if progress_callback:
                 progress_callback(msg)
         
-        # Build the main prompt for orchestrator
-        main_prompt = f"""Create a newsletter about: {topic}
+        # Build a single-agent prompt — Claude does everything itself
+        main_prompt = f"""You are a professional newsletter writer. Create a complete newsletter about: {topic}
 
 Style: {style}
-Time period: Focus on articles from {freshness_desc}
-Workspace: {workspace}
+Time period: Focus on news from {freshness_desc}
 
-YOU ARE AN ORCHESTRATOR. Do NOT do the work yourself. Instead, DELEGATE to subagents:
+STEPS (do all of these yourself):
+1. Use WebSearch to find 6-8 recent, relevant articles about "{topic}" and subtopics
+2. Use WebFetch to skim 2-3 of the most promising articles for details
+3. Write the final newsletter to {workspace}/newsletter.txt in this exact format:
+   - First line: Subject: [compelling subject line]
+   - Blank line
+   - Body: 5-7 sections, each covering one story/theme
+   - Each section: headline, 2-3 sentence summary, source URL (real URLs only)
+   - Brief closing paragraph
 
-STEP 1: Delegate to "topic-generator" subagent
-- Use the Task tool to invoke the topic-generator
-- Tell it to generate 5-7 diverse search queries for "{topic}"
-- Wait for it to complete
+TONE: Straightforward news delivery — no hype, no marketing language.
+CRITICAL: Only use real URLs from your search results. Never hallucinate URLs."""
 
-STEP 2: Delegate to "article-researcher" subagent
-- Use the Task tool to invoke the article-researcher
-- Give it the search queries from step 1
-- Tell it to search for articles and save summaries to {workspace}/articles.txt
-- Wait for it to complete
-
-STEP 3: Delegate to "newsletter-writer" subagent
-- Use the Task tool to invoke the newsletter-writer
-- Tell it to read {workspace}/articles.txt and write the final newsletter to {workspace}/newsletter.txt
-- Wait for it to complete
-
-CRITICAL RULES:
-- DO NOT use WebSearch, Write, or Read yourself - let the subagents do it
-- ONLY use the Task tool to delegate work
-- Each subagent has the tools it needs already configured
-- Your job is to COORDINATE, not execute"""
-        
         log_progress(f"Starting newsletter generation: {topic}")
         log_progress(f"Mode: {'DEBUG (all Haiku)' if self.debug_mode else 'PRODUCTION (Sonnet)'}")
-        
-        # Create options with subagents
+
         options = ClaudeAgentOptions(
             model=self.models["orchestrator"],
-            allowed_tools=["Task", "Read", "Write", "WebSearch", "WebFetch"],
-            agents=self._create_subagents(),
+            allowed_tools=["WebSearch", "WebFetch", "Write"],
             cwd=workspace,
-            permission_mode="acceptEdits"  # Auto-approve file operations
+            permission_mode="bypassPermissions",
         )
         
         # Track the conversation and timing
@@ -218,36 +203,18 @@ CRITICAL RULES:
                             log_progress(f"Claude: {text[:150]}...")
                             logger.info(f"[Agent Reasoning] {text}")
                         elif hasattr(block, "name"):
-                            # Tool being called - log with inputs!
                             tool_name = block.name
                             tool_input = getattr(block, "input", {})
-                            
-                            # Format tool input for logging
                             if tool_name == "WebSearch":
-                                query_str = tool_input.get("query", "")
-                                log_progress(f"→ WebSearch: '{query_str}'")
-                                logger.info(f"[Tool: WebSearch] Query: {query_str}")
+                                q = tool_input.get("query", "")
+                                log_progress(f"Searching: {q}")
+                            elif tool_name == "WebFetch":
+                                url = tool_input.get("url", "")
+                                log_progress(f"Reading article: {url[:60]}...")
                             elif tool_name == "Write":
-                                filepath = tool_input.get("file_path", "")
-                                content_preview = str(tool_input.get("content", ""))[:100]
-                                log_progress(f"→ Write: {filepath} ({len(str(tool_input.get('content', '')))} chars)")
-                                logger.info(f"[Tool: Write] File: {filepath}, Content: {content_preview}...")
-                            elif tool_name == "Read":
-                                filepath = tool_input.get("file_path", "")
-                                log_progress(f"→ Read: {filepath}")
-                                logger.info(f"[Tool: Read] File: {filepath}")
-                            elif tool_name == "Bash":
-                                command = tool_input.get("command", "")
-                                log_progress(f"→ Bash: {command}")
-                                logger.info(f"[Tool: Bash] Command: {command}")
-                            elif tool_name == "Task":
-                                agent_name = tool_input.get("agent_name", "")
-                                task_prompt = str(tool_input.get("prompt", ""))[:100]
-                                log_progress(f"→ Task: {agent_name} - {task_prompt}...")
-                                logger.info(f"[Tool: Task] Agent: {agent_name}, Prompt: {task_prompt}...")
+                                log_progress("Writing newsletter...")
                             else:
-                                log_progress(f"→ {tool_name}: {str(tool_input)[:100]}")
-                                logger.info(f"[Tool: {tool_name}] Input: {tool_input}")
+                                log_progress(f"{tool_name}...")
                             
                 elif isinstance(message, ResultMessage):
                     # Final result message with timing
