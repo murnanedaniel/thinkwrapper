@@ -175,11 +175,19 @@ CRITICAL: Only use real URLs from your search results. Never hallucinate URLs.""
         log_progress(f"Starting newsletter generation: {topic}")
         log_progress(f"Mode: {'DEBUG (all Haiku)' if self.debug_mode else 'PRODUCTION (Sonnet)'}")
 
+        # Build env overrides: unset ANTHROPIC_API_KEY so the bundled CLI
+        # uses the Claude Code subscription instead of expensive API calls,
+        # and unset CLAUDECODE to avoid nested-session detection.
+        sdk_env = {"CLAUDECODE": ""}
+        if not os.environ.get("USE_API_KEY"):
+            sdk_env["ANTHROPIC_API_KEY"] = ""
+
         options = ClaudeAgentOptions(
             model=self.models["orchestrator"],
             allowed_tools=["WebSearch", "WebFetch", "Write"],
             cwd=workspace,
             permission_mode="bypassPermissions",
+            env=sdk_env,
         )
         
         # Track the conversation and timing

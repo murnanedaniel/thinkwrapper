@@ -44,9 +44,10 @@ def generate_newsletter_async(self, topic, style="concise", schedule="weekly", d
             logger.info(f"[Progress] {message}")
 
         from app.agent_service import generate_newsletter_sync
+        effective_debug = debug_mode or os.environ.get('NEWSLETTER_DEBUG', '').lower() == 'true'
         result = generate_newsletter_sync(
             topic=topic, schedule=schedule, style=style,
-            debug_mode=debug_mode, progress_callback=progress_callback
+            debug_mode=effective_debug, progress_callback=progress_callback
         )
         if result is None:
             raise Exception(f"Newsletter generation failed for topic '{topic}'")

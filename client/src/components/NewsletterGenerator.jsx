@@ -51,7 +51,7 @@ function NewsletterGenerator({ newsletter, onClose, userEmail = 'murnane2@gmail.
   }
 
   const pollTaskStatus = async (id) => {
-    const maxAttempts = 120 // 120 seconds max (increased for multi-search)
+    const maxAttempts = 300 // 300 seconds max (agent SDK generation can take 1-4 min)
     let attempts = 0
     let isComplete = false
 
@@ -97,6 +97,9 @@ function NewsletterGenerator({ newsletter, onClose, userEmail = 'murnane2@gmail.
             setProgress(progressData.percent)
             setProgressMessage(progressData.message)
           }
+        } else if (state === 'RETRY') {
+          // Task is retrying — treat as still in progress
+          setProgressMessage('Retrying generation...')
         } else if (state === 'PENDING' || state === 'STARTED') {
           // Update progress with generic message
           const progressValue = 10 + (attempts / maxAttempts) * 20

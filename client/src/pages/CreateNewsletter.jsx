@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { getConfig } from '../config'
@@ -29,6 +29,12 @@ function CreateNewsletter({ isLoggedIn, user, paddleReady, refreshUser }) {
   const [taskId, setTaskId] = useState(null)
   const [stages, setStages] = useState({ searching: [], reading: [], writing: [] })
   const [activeStage, setActiveStage] = useState(null) // 'searching' | 'reading' | 'writing' | 'done'
+
+  // Refs so Paddle callback always reads latest values
+  const formDataRef = useRef(formData)
+  const previewRef = useRef(preview)
+  useEffect(() => { formDataRef.current = formData }, [formData])
+  useEffect(() => { previewRef.current = preview }, [preview])
 
   const classifyMessage = (status) => {
     if (status.startsWith('Searching:')) return { stage: 'searching', detail: status.slice(10).trim() }
@@ -105,7 +111,6 @@ function CreateNewsletter({ isLoggedIn, user, paddleReady, refreshUser }) {
       })
       if (response.data.success && response.data.data?.task_id) {
         setTaskId(response.data.data.task_id)
-        setProgressMsg('Starting...')
       } else {
         setError(response.data.error || 'Generation failed')
         setStep(STATES.INPUT)
@@ -163,15 +168,17 @@ function CreateNewsletter({ isLoggedIn, user, paddleReady, refreshUser }) {
             })
             if (refreshUser) await refreshUser()
 
-            // Create the newsletter
+            // Create the newsletter (use refs to get latest values)
+            const fd = formDataRef.current
+            const pv = previewRef.current
             const response = await axios.post('/api/newsletters', {
-              topic: formData.topic,
-              name: formData.name || formData.topic,
-              description: formData.description,
-              style: formData.style,
-              schedule: formData.schedule,
-              subject: preview?.subject,
-              content: preview?.content,
+              topic: fd.topic,
+              name: fd.name || fd.topic,
+              description: fd.description,
+              style: fd.style,
+              schedule: fd.schedule,
+              subject: pv?.subject,
+              content: pv?.content,
             })
             if (response.data.success) {
               setResult(response.data.data)

@@ -37,7 +37,9 @@ def make_celery(app_name=__name__):
         # Result backend configuration
         result_expires=3600,  # Results expire after 1 hour
         
-        # Worker configuration
+        # Worker configuration — solo pool required because tasks use
+        # claude-agent-sdk which spawns async subprocesses (deadlocks with prefork)
+        worker_pool='solo',
         worker_prefetch_multiplier=4,
         worker_max_tasks_per_child=1000,
         
